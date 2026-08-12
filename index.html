@@ -13,6 +13,9 @@
   // workerSrc vazio = roda no thread principal, sem blob worker (compatível com claudeusercontent)
   if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 </script>
+<!-- Firebase (SDK compat, compatível com script classico) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
 <style>
 :root{
   --verde:#2d6a4f;--verde2:#40916c;--verde3:#52b788;
@@ -692,30 +695,99 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-size:11px}
 <div id="toast"></div>
 
 <script>
+// =================== FIREBASE ===================
+const firebaseConfig = {
+  apiKey: "AIzaSyD_1JfNr8oHkfJM8QvjydrQ4nyYtIG2T6M",
+  authDomain: "sistema-cfoc-ibacem.firebaseapp.com",
+  databaseURL: "https://sistema-cfoc-ibacem-default-rtdb.firebaseio.com",
+  projectId: "sistema-cfoc-ibacem",
+  storageBucket: "sistema-cfoc-ibacem.firebasestorage.app",
+  messagingSenderId: "219653982822",
+  appId: "1:219653982822:web:689447630b576abd103ba7",
+  measurementId: "G-H3YJ245QB9"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+// Cache local para funcionar mesmo com internet instável
+db.enablePersistence({synchronizeTabs:true}).catch(()=>{ /* persistência indisponível (ex.: várias abas antigas) — segue sem cache offline */ });
+
+const colRegistros = db.collection('registros');
+const colUsuarios  = db.collection('usuarios');
+
 // =================== DADOS ===================
-let regs = JSON.parse(localStorage.getItem('cfo_v5')||'[]');
-const save = ()=>localStorage.setItem('cfo_v5',JSON.stringify(regs));
+let regs = [];
+let _primeiraCargaRegs = true;
 
+// Dados de demonstração — usados apenas para popular o Firestore
+// na primeiríssima execução do sistema (coleção "registros" vazia)
+const DEMO_REGISTROS = [
+  {id:'d1',tipo:'CFO',orgao:'ADAB',data:'2020-01-07',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004139',quantidade:8.8,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
+  {id:'d2',tipo:'CFO',orgao:'ADAB',data:'2020-01-07',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004140',quantidade:3.3,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
+  {id:'d3',tipo:'CFO',orgao:'ADAB',data:'2020-01-08',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004141',quantidade:2.75,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
+  {id:'d4',tipo:'CFO',orgao:'ADAB',data:'2020-01-08',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004142',quantidade:7.15,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
+  {id:'d5',tipo:'CFO',orgao:'ADAB',data:'2020-01-10',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004143',quantidade:8.8,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
+  {id:'d6',tipo:'CFO',orgao:'ADAB',data:'2020-01-10',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004144',quantidade:2.75,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
+  {id:'d7',tipo:'CFOC',orgao:'ADAB',data:'2025-01-03',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250001',nCfo:'2924077805',quantidade:30,unidade:'ton',produto:'UVA',nLote:'29184070052250001',nCfoc:'29250105',qtdCfoc:30,destino:'BRASIL',obs:''},
+  {id:'d8',tipo:'CFOC',orgao:'ADAB',data:'2025-01-06',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250002',nCfo:'2625002484',quantidade:12,unidade:'ton',produto:'UVA',nLote:'29184070052250002',nCfoc:'29250342',qtdCfoc:48,destino:'BRASIL',obs:''},
+  {id:'d9',tipo:'CFOC',orgao:'ADAB',data:'2025-01-06',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250002',nCfo:'2625002485',quantidade:12,unidade:'ton',produto:'UVA',nLote:'29184070052250002',nCfoc:'29250342',qtdCfoc:48,destino:'BRASIL',obs:''},
+  {id:'d10',tipo:'CFOC',orgao:'ADAB',data:'2025-01-06',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250002',nCfo:'2625002486',quantidade:24,unidade:'ton',produto:'UVA',nLote:'29184070052250002',nCfoc:'29250342',qtdCfoc:48,destino:'BRASIL',obs:''},
+  {id:'d11',tipo:'CFOC',orgao:'ADAB',data:'2025-01-07',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250003',nCfo:'2625000477',quantidade:8,unidade:'ton',produto:'UVA',nLote:'29184070052250003',nCfoc:'29250366',qtdCfoc:58,destino:'BRASIL',obs:''},
+  {id:'d12',tipo:'CFOC',orgao:'ADAB',data:'2025-01-07',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250003',nCfo:'2625000478',quantidade:12,unidade:'ton',produto:'UVA',nLote:'29184070052250003',nCfoc:'29250366',qtdCfoc:58,destino:'BRASIL',obs:''},
+  {id:'d13',tipo:'CFOC',orgao:'ADAB',data:'2025-01-07',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250003',nCfo:'2625000476',quantidade:18,unidade:'ton',produto:'UVA',nLote:'29184070052250003',nCfoc:'29250366',qtdCfoc:58,destino:'BRASIL',obs:''},
+  {id:'d14',tipo:'CFOC',orgao:'ADAB',data:'2025-01-07',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250003',nCfo:'2625000475',quantidade:20,unidade:'ton',produto:'UVA',nLote:'29184070052250003',nCfoc:'29250366',qtdCfoc:58,destino:'BRASIL',obs:''},
+];
 
-// Demo data
-if(!regs.length){
-  regs=[
-    {id:'d1',tipo:'CFO',orgao:'ADAB',data:'2020-01-07',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004139',quantidade:8.8,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
-    {id:'d2',tipo:'CFO',orgao:'ADAB',data:'2020-01-07',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004140',quantidade:3.3,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
-    {id:'d3',tipo:'CFO',orgao:'ADAB',data:'2020-01-08',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004141',quantidade:2.75,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
-    {id:'d4',tipo:'CFO',orgao:'ADAB',data:'2020-01-08',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004142',quantidade:7.15,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
-    {id:'d5',tipo:'CFO',orgao:'ADAB',data:'2020-01-10',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004143',quantidade:8.8,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
-    {id:'d6',tipo:'CFO',orgao:'ADAB',data:'2020-01-10',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004144',quantidade:2.75,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
-    {id:'d7',tipo:'CFOC',orgao:'ADAB',data:'2025-01-03',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250001',nCfo:'2924077805',quantidade:30,unidade:'ton',produto:'UVA',nLote:'29184070052250001',nCfoc:'29250105',qtdCfoc:30,destino:'BRASIL',obs:''},
-    {id:'d8',tipo:'CFOC',orgao:'ADAB',data:'2025-01-06',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250002',nCfo:'2625002484',quantidade:12,unidade:'ton',produto:'UVA',nLote:'29184070052250002',nCfoc:'29250342',qtdCfoc:48,destino:'BRASIL',obs:''},
-    {id:'d9',tipo:'CFOC',orgao:'ADAB',data:'2025-01-06',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250002',nCfo:'2625002485',quantidade:12,unidade:'ton',produto:'UVA',nLote:'29184070052250002',nCfoc:'29250342',qtdCfoc:48,destino:'BRASIL',obs:''},
-    {id:'d10',tipo:'CFOC',orgao:'ADAB',data:'2025-01-06',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250002',nCfo:'2625002486',quantidade:24,unidade:'ton',produto:'UVA',nLote:'29184070052250002',nCfoc:'29250342',qtdCfoc:48,destino:'BRASIL',obs:''},
-    {id:'d11',tipo:'CFOC',orgao:'ADAB',data:'2025-01-07',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250003',nCfo:'2625000477',quantidade:8,unidade:'ton',produto:'UVA',nLote:'29184070052250003',nCfoc:'29250366',qtdCfoc:58,destino:'BRASIL',obs:''},
-    {id:'d12',tipo:'CFOC',orgao:'ADAB',data:'2025-01-07',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250003',nCfo:'2625000478',quantidade:12,unidade:'ton',produto:'UVA',nLote:'29184070052250003',nCfoc:'29250366',qtdCfoc:58,destino:'BRASIL',obs:''},
-    {id:'d13',tipo:'CFOC',orgao:'ADAB',data:'2025-01-07',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250003',nCfo:'2625000476',quantidade:18,unidade:'ton',produto:'UVA',nLote:'29184070052250003',nCfoc:'29250366',qtdCfoc:58,destino:'BRASIL',obs:''},
-    {id:'d14',tipo:'CFOC',orgao:'ADAB',data:'2025-01-07',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250003',nCfo:'2625000475',quantidade:20,unidade:'ton',produto:'UVA',nLote:'29184070052250003',nCfoc:'29250366',qtdCfoc:58,destino:'BRASIL',obs:''},
-  ];
-  save();
+// Popula o Firestore com os dados de demonstração (só roda 1x, quando a coleção está vazia)
+async function seedDemoRegistros(){
+  const batch = db.batch();
+  DEMO_REGISTROS.forEach(r=>{
+    const {id, ...dados} = r;
+    batch.set(colRegistros.doc(id), dados);
+  });
+  await batch.commit();
+}
+
+// Ouve a coleção "registros" em tempo real: qualquer criação/edição/exclusão
+// feita por qualquer usuário reflete automaticamente na tela de todos.
+function carregarRegistros(){
+  colRegistros.onSnapshot(async (snap)=>{
+    if(snap.empty && _primeiraCargaRegs){
+      _primeiraCargaRegs = false;
+      try{ await seedDemoRegistros(); }catch(e){ console.error('Erro ao popular dados demo:', e); }
+      return; // o próprio seed dispara um novo snapshot com os dados
+    }
+    _primeiraCargaRegs = false;
+    regs = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    atualizarTelaAtual();
+  }, err=>{
+    console.error('Erro ao carregar registros do Firestore:', err);
+    toast('Erro ao carregar dados do Firestore','err');
+  });
+}
+
+// Cria/sobrescreve um registro no Firestore (usa reg.id como ID do documento)
+async function salvarRegistro(reg){
+  const {id, ...dados} = reg;
+  await colRegistros.doc(id).set(dados);
+}
+
+// Atualiza campos de um registro existente
+async function atualizarRegistro(id, dados){
+  await colRegistros.doc(id).update(dados);
+}
+
+// Exclui um registro
+async function excluirRegistro(id){
+  await colRegistros.doc(id).delete();
+}
+
+// Re-renderiza a aba que estiver visível no momento, refletindo o estado atual de "regs"
+function atualizarTelaAtual(){
+  popFiltros();
+  const tabAtiva = document.querySelector('.tab.active')?.id?.replace('tab-','');
+  if(tabAtiva==='cfo'){ renderTabsAno('CFO'); renderCFO(); }
+  else if(tabAtiva==='cfoc'){ renderTabsAno('CFOC'); renderCFOC(); }
+  else if(tabAtiva==='rel'){ renderRel(); }
 }
 
 
@@ -1387,11 +1459,14 @@ function addManual(){
     const qtd = parseFloat(g('m-qtd'));
     if(!qtd || qtd <= 0){ toast('Informe a Quantidade corretamente','err'); document.getElementById('m-qtd').focus(); return; }
 
-    regs.push({id:'m_'+Date.now(),tipo:'CFO',orgao:g('m-org'),data:g('m-data'),
+    const novoCfo = {id:'m_'+Date.now(),tipo:'CFO',orgao:g('m-org'),data:g('m-data'),
       variedade:g('m-var'),produtor:g('m-prod'),codUp:g('m-up'),nCfo:g('m-ncfo'),
       quantidade:qtd,unidade:g('m-un'),produto:'UVA',
-      nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:g('m-obs')});
-    save();popFiltros();renderTabsAno('CFO');renderCFO();renderRel();toast('CFO adicionado ✓','ok');limpar();
+      nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:g('m-obs')};
+    salvarRegistro(novoCfo).then(()=>{
+      toast('CFO adicionado ✓','ok');
+      limpar();
+    }).catch(err=>{ console.error(err); toast('Erro ao salvar no Firestore','err'); });
     return;
   }
 
@@ -1425,6 +1500,7 @@ function addManual(){
   const destino=g('m-dest');
 
   let adicionados=0;
+  const batch = db.batch();
   linhas.forEach(tr=>{
     const nCfo=tr.querySelector('.vinc-ncfo')?.value?.trim()||'';
     const produtor=tr.querySelector('.vinc-prod')?.value?.trim()||'';
@@ -1432,16 +1508,18 @@ function addManual(){
     const quantidade=parseFloat(tr.querySelector('.vinc-qtd')?.value)||0;
     const unidade=tr.querySelector('.vinc-un')?.value||'ton';
     if(!nCfo) return;
-    regs.push({id:'m_'+Date.now()+'_'+adicionados,tipo:'CFOC',orgao,data,
+    const novoId = 'm_'+Date.now()+'_'+adicionados;
+    batch.set(colRegistros.doc(novoId), {tipo:'CFOC',orgao,data,
       variedade,produtor,codUp,nCfo,quantidade,unidade,produto,
       nLote,nCfoc,qtdCfoc,destino,obs:''});
     adicionados++;
   });
 
   if(!adicionados){toast('Informe o Nº CFO em pelo menos uma linha','err');return;}
-  save();popFiltros();renderTabsAno('CFOC');renderCFOC();renderRel();
-  toast(`CFOC com ${adicionados} CFO(s) adicionado ✓`,'ok');
-  limpar();
+  batch.commit().then(()=>{
+    toast(`CFOC com ${adicionados} CFO(s) adicionado ✓`,'ok');
+    limpar();
+  }).catch(err=>{ console.error(err); toast('Erro ao salvar no Firestore','err'); });
 }
 
 function addManualContinuar(){
@@ -1996,8 +2074,22 @@ function pdfCFOC(nCfoc){
   toast(`PDF do CFOC ${r0.nCfoc} gerado ✓`,'ok');
 }
 
-function del(id){if(!confirm('Excluir?'))return;regs=regs.filter(r=>r.id!==id);save();const tabAtiva=document.querySelector('.tab.active')?.id?.replace('tab-','');if(tabAtiva==='cfo'){renderTabsAno('CFO');renderCFO();}else if(tabAtiva==='cfoc'){renderTabsAno('CFOC');renderCFOC();}renderRel();toast('Excluído','inf');}
-function delGrupo(chave){if(!confirm('Excluir todos os CFOs deste grupo?'))return;regs=regs.filter(r=>r.tipo!=='CFOC'||(r.nLote!==chave&&r.nCfoc!==chave));save();renderTabsAno('CFOC');renderCFOC();renderRel();toast('Grupo excluído','inf');}
+function del(id){
+  if(!confirm('Excluir?'))return;
+  excluirRegistro(id)
+    .then(()=>toast('Excluído','inf'))
+    .catch(err=>{ console.error(err); toast('Erro ao excluir no Firestore','err'); });
+}
+function delGrupo(chave){
+  if(!confirm('Excluir todos os CFOs deste grupo?'))return;
+  const alvo = regs.filter(r=>r.tipo==='CFOC' && (r.nLote===chave || r.nCfoc===chave));
+  if(!alvo.length){ toast('Nenhum registro encontrado','err'); return; }
+  const batch = db.batch();
+  alvo.forEach(r=>batch.delete(colRegistros.doc(r.id)));
+  batch.commit()
+    .then(()=>toast('Grupo excluído','inf'))
+    .catch(err=>{ console.error(err); toast('Erro ao excluir grupo no Firestore','err'); });
+}
 function srt(t,f){if(sf[t]===f)sd[t]*=-1;else{sf[t]=f;sd[t]=1;}if(t==='cfo')renderCFO();else renderCFOC();}
 
 // =================== EXCEL ===================
@@ -2123,13 +2215,13 @@ function toast(msg,type='inf'){
 
 // =================== INIT ===================
 popFiltros();
+carregarRegistros(); // inicia o listener em tempo real da coleção "registros"
 
 // ====================================================
 // =================== LOGIN SYSTEM ===================
 // ====================================================
 
 const AUTH_KEY   = 'cfo_auth_session';
-const USERS_KEY  = 'cfo_users';
 const SESSION_H  = 8; // horas de sessão
 
 // --- Hash SHA-256 ---
@@ -2138,40 +2230,53 @@ async function sha256(msg){
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-// --- Usuários ---
-function getUsers(){
-  try{ return JSON.parse(localStorage.getItem(USERS_KEY)||'[]'); }catch{ return []; }
+// --- Usuários (Firestore: coleção "usuarios", ID do documento = username) ---
+// Guardar os usuários no Firestore (em vez de localStorage) é o que permite
+// que o mesmo login funcione em qualquer computador/dispositivo.
+async function getUsers(){
+  const snap = await colUsuarios.get();
+  return snap.docs.map(d=>({id:d.id, ...d.data()}));
 }
-function saveUsers(u){ localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
+async function saveUsuario(user){
+  const { id, ...dados } = user;
+  await colUsuarios.doc(id).set(dados);
+}
+async function excluirUsuarioDoc(id){
+  await colUsuarios.doc(id).delete();
+}
 
 async function initDefaultUser(){
-  const users = getUsers();
-  if(users.length === 0){
+  const snap = await colUsuarios.limit(1).get();
+  if(snap.empty){
     const hash = await sha256('admin123');
-    saveUsers([{
-      id:'u1', username:'admin', nome:'Administrador',
+    await saveUsuario({
+      id:'admin', username:'admin', nome:'Administrador',
       role:'admin', passHash: hash, criadoEm: new Date().toISOString()
-    }]);
+    });
   }
 }
 
 // --- Sessão ---
+// Observação: a sessão de login usa sessionStorage (não localStorage). Ela
+// identifica apenas QUEM está logado neste navegador/aba — os dados em si
+// (registros e usuários) ficam 100% no Firestore, então nenhum dado do
+// sistema depende de armazenamento local.
 function getSession(){
   try{
-    const s = JSON.parse(localStorage.getItem(AUTH_KEY)||'null');
+    const s = JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null');
     if(!s) return null;
-    if(new Date() > new Date(s.expira)){ localStorage.removeItem(AUTH_KEY); return null; }
+    if(new Date() > new Date(s.expira)){ sessionStorage.removeItem(AUTH_KEY); return null; }
     return s;
   }catch{ return null; }
 }
 function setSession(user){
   const expira = new Date(Date.now() + SESSION_H * 3600 * 1000).toISOString();
-  localStorage.setItem(AUTH_KEY, JSON.stringify({
+  sessionStorage.setItem(AUTH_KEY, JSON.stringify({
     userId: user.id, username: user.username,
     nome: user.nome, role: user.role, expira
   }));
 }
-function clearSession(){ localStorage.removeItem(AUTH_KEY); }
+function clearSession(){ sessionStorage.removeItem(AUTH_KEY); }
 
 // --- Login ---
 async function fazerLogin(){
@@ -2185,8 +2290,15 @@ async function fazerLogin(){
     errEl.classList.add('show'); return;
   }
 
-  const users = getUsers();
-  const user  = users.find(u => u.username.toLowerCase() === username);
+  let user;
+  try{
+    const doc = await colUsuarios.doc(username).get();
+    user = doc.exists ? { id: doc.id, ...doc.data() } : null;
+  }catch(e){
+    console.error(e);
+    errMsg.textContent = 'Erro ao consultar o Firestore. Verifique sua conexão.';
+    errEl.classList.add('show'); return;
+  }
   if(!user){
     errMsg.textContent = 'Usuário não encontrado.';
     errEl.classList.add('show'); return;
@@ -2253,15 +2365,19 @@ async function alterarSenha(){
   if(nova.length < 6){ toast('Nova senha deve ter ao menos 6 caracteres','err'); return; }
   if(nova !== conf){ toast('Confirmação de senha não confere','err'); return; }
 
-  const users    = getUsers();
-  const idx      = users.findIndex(u => u.id === sess.userId);
-  if(idx === -1){ toast('Usuário não encontrado','err'); return; }
+  let user;
+  try{
+    const doc = await colUsuarios.doc(sess.userId).get();
+    user = doc.exists ? { id: doc.id, ...doc.data() } : null;
+  }catch(e){ console.error(e); toast('Erro ao consultar o Firestore','err'); return; }
+  if(!user){ toast('Usuário não encontrado','err'); return; }
 
   const hashAtual = await sha256(atual);
-  if(hashAtual !== users[idx].passHash){ toast('Senha atual incorreta','err'); return; }
+  if(hashAtual !== user.passHash){ toast('Senha atual incorreta','err'); return; }
 
-  users[idx].passHash = await sha256(nova);
-  saveUsers(users);
+  try{
+    await colUsuarios.doc(user.id).update({ passHash: await sha256(nova) });
+  }catch(e){ console.error(e); toast('Erro ao salvar no Firestore','err'); return; }
   fechaModalSenha();
   toast('Senha alterada com sucesso ✓','ok');
 }
@@ -2274,10 +2390,13 @@ function abrirModalUsuarios(){
 }
 function fechaModalUsuarios(){ document.getElementById('modal-usuarios').classList.remove('open'); }
 
-function renderUserList(){
-  const users = getUsers();
-  const sess  = getSession();
+async function renderUserList(){
   const el    = document.getElementById('usr-list');
+  el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px">Carregando...</div>';
+  let users;
+  try{ users = await getUsers(); }
+  catch(e){ console.error(e); el.innerHTML='<div style="text-align:center;color:var(--vermelho);padding:20px">Erro ao carregar usuários do Firestore.</div>'; return; }
+  const sess  = getSession();
   if(!users.length){ el.innerHTML='<div style="text-align:center;color:var(--muted);padding:20px">Nenhum usuário cadastrado.</div>'; return; }
   el.innerHTML = users.map(u=>`
     <div class="usr-item">
@@ -2306,12 +2425,17 @@ async function criarUsuario(){
   if(pass.length < 6){ toast('Senha deve ter ao menos 6 caracteres','err'); return; }
   if(!/^[a-z0-9._-]+$/.test(username)){ toast('Usuário: use letras, números, ponto ou hífen','err'); return; }
 
-  const users = getUsers();
-  if(users.find(u=>u.username===username)){ toast('Usuário já existe','err'); return; }
+  let jaExiste;
+  try{
+    const doc = await colUsuarios.doc(username).get();
+    jaExiste = doc.exists;
+  }catch(e){ console.error(e); toast('Erro ao consultar o Firestore','err'); return; }
+  if(jaExiste){ toast('Usuário já existe','err'); return; }
 
   const hash = await sha256(pass);
-  users.push({ id:'u'+Date.now(), username, nome, role, passHash:hash, criadoEm:new Date().toISOString() });
-  saveUsers(users);
+  try{
+    await saveUsuario({ id: username, username, nome, role, passHash:hash, criadoEm:new Date().toISOString() });
+  }catch(e){ console.error(e); toast('Erro ao salvar no Firestore','err'); return; }
   document.getElementById('nu-user').value='';
   document.getElementById('nu-pass').value='';
   document.getElementById('nu-nome').value='';
@@ -2319,14 +2443,13 @@ async function criarUsuario(){
   toast(`Usuário @${username} criado ✓`,'ok');
 }
 
-function excluirUsuario(id){
-  const users = getUsers();
-  const u = users.find(x=>x.id===id);
-  if(!u) return;
-  if(!confirm(`Excluir o usuário @${u.username}?`)) return;
-  saveUsers(users.filter(x=>x.id!==id));
+async function excluirUsuario(id){
+  if(!confirm(`Excluir o usuário @${id}?`)) return;
+  try{
+    await excluirUsuarioDoc(id);
+  }catch(e){ console.error(e); toast('Erro ao excluir no Firestore','err'); return; }
   renderUserList();
-  toast(`Usuário @${u.username} excluído`,'ok');
+  toast(`Usuário @${id} excluído`,'ok');
 }
 
 // --- Renovar sessão a cada interação ---
