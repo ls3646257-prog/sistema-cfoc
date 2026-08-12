@@ -1,0 +1,2359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema CFO / CFOC — Livro Uva</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.7.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  // workerSrc vazio = roda no thread principal, sem blob worker (compatível com claudeusercontent)
+  if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+</script>
+<style>
+:root{
+  --verde:#2d6a4f;--verde2:#40916c;--verde3:#52b788;
+  --bg:#f0f4f8;--card:#fff;--borda:#e2e8f0;--texto:#1a2332;--muted:#64748b;
+  --azul:#1d4ed8;--roxo:#7e22ce;--amarelo:#d97706;--vermelho:#dc2626;--google:#4285f4;
+  --sh:0 1px 4px rgba(0,0,0,.08);--shm:0 4px 20px rgba(0,0,0,.1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--texto);min-height:100vh}
+.hd{background:var(--verde);color:#fff;padding:0 28px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:0 2px 12px rgba(0,0,0,.2)}
+.hd-l{display:flex;align-items:center;gap:12px}
+.hd-ico{width:36px;height:36px;background:rgba(255,255,255,.15);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.hd-title{font-size:16px;font-weight:700}
+.hd-sub{font-size:10px;opacity:.7;font-family:'IBM Plex Mono',monospace}
+.hd-r{display:flex;align-items:center;gap:10px}
+.hd-clock{font-family:'IBM Plex Mono',monospace;font-size:12px;opacity:.8}
+.gs-pill{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:4px 12px;font-size:11px;display:flex;align-items:center;gap:6px;cursor:pointer;transition:all .2s}
+.gs-pill:hover{background:rgba(255,255,255,.25)}
+.gs-dot{width:8px;height:8px;border-radius:50%;background:#4ade80}
+.gs-dot.off{background:#fca5a5}
+
+.tabs{background:var(--card);border-bottom:2px solid var(--borda);display:flex;padding:0 28px;position:sticky;top:60px;z-index:199}
+.tab{padding:13px 20px;font-size:13px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;color:var(--muted);transition:all .2s;display:flex;align-items:center;gap:6px}
+.tab:hover{color:var(--verde)}.tab.active{color:var(--verde);border-bottom-color:var(--verde)}
+
+/* ====== ABAS DE ANO ====== */
+.tabs-ano{background:var(--card);border-bottom:1px solid var(--borda);display:flex;padding:0 28px;gap:4px;overflow-x:auto;scrollbar-width:none}
+.tabs-ano::-webkit-scrollbar{display:none}
+.tab-ano{padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;border-radius:6px 6px 0 0;border:1px solid transparent;border-bottom:none;color:var(--muted);transition:all .18s;white-space:nowrap;font-family:'IBM Plex Mono',monospace;letter-spacing:.5px;margin-bottom:-1px;display:flex;align-items:center;gap:6px}
+.tab-ano:hover{color:var(--verde);background:rgba(82,183,136,.06)}
+.tab-ano.active{color:var(--verde);background:#fff;border-color:var(--borda);border-bottom-color:#fff;font-weight:800}
+.tab-ano .ano-badge{font-size:9px;background:var(--verde);color:#fff;border-radius:10px;padding:1px 6px;font-weight:700}
+.tab-ano.active .ano-badge{background:var(--verde2)}
+.tab-ano-todos{color:var(--azul)}.tab-ano-todos.active{color:var(--azul);border-color:var(--borda)}
+.tab-ano-todos .ano-badge{background:var(--azul)}
+.ano-label{font-size:10px;color:var(--muted);padding:8px 12px;display:flex;align-items:center;white-space:nowrap;font-family:'IBM Plex Mono',monospace}
+#tabs-ano-wrap{display:none}
+
+.wrap{max-width:1440px;margin:0 auto;padding:24px 28px}
+
+/* SETUP GOOGLE BANNER */
+.setup-banner{background:linear-gradient(135deg,#e8f0fe,#f0f9ff);border:1.5px solid #93c5fd;border-radius:14px;padding:24px;margin-bottom:22px}
+.setup-banner h3{font-size:16px;font-weight:700;color:#1e40af;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.setup-banner p{font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6}
+.setup-steps{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:18px}
+.step{background:#fff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 16px}
+.step-num{width:26px;height:26px;background:#1d4ed8;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-bottom:8px}
+.step h4{font-size:12px;font-weight:700;margin-bottom:4px}
+.step p{font-size:11px;color:var(--muted);line-height:1.5}
+.step code{display:block;background:#f1f5f9;padding:4px 7px;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:10px;margin-top:4px;cursor:pointer;border:1px solid var(--borda)}
+.step code:hover{background:#e2e8f0}
+.url-row{display:flex;gap:8px;align-items:center}
+.url-row input{flex:1;padding:9px 12px;border:1px solid var(--borda);border-radius:8px;font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;background:#fff}
+.url-row input:focus{border-color:var(--google)}
+.sheet-id-row{display:flex;gap:8px;align-items:center;margin-top:10px}
+.sheet-id-row input{flex:1;padding:9px 12px;border:1px solid var(--borda);border-radius:8px;font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;background:#fff}
+
+/* CARDS */
+.card{background:var(--card);border:1px solid var(--borda);border-radius:12px;overflow:hidden;margin-bottom:20px;box-shadow:var(--sh)}
+.card-h{padding:14px 20px;border-bottom:1px solid var(--borda);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.card-h h2{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px}
+.ct{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+
+/* API */
+.api-bar{background:#fffbeb;border:1.5px solid #fcd34d;border-radius:10px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:flex-start;gap:14px}
+.api-bar .ico{font-size:22px;flex-shrink:0;margin-top:2px}
+.api-bar-r{flex:1}
+.api-bar h4{font-size:13px;font-weight:700;margin-bottom:2px}
+.api-bar p{font-size:12px;color:var(--muted)}
+.api-row{display:flex;gap:8px;margin-top:8px}
+.api-row input{flex:1;padding:7px 11px;border:1px solid var(--borda);border-radius:7px;font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;background:#fff}
+.api-row input:focus{border-color:#fbbf24}
+
+/* UPLOAD */
+.upzone{border:2.5px dashed var(--borda);border-radius:12px;padding:36px;text-align:center;cursor:pointer;transition:all .25s;position:relative;background:var(--card)}
+.upzone:hover,.upzone.drag{border-color:var(--verde3);background:rgba(82,183,136,.04)}
+.upzone input{position:absolute;inset:0;opacity:0;cursor:pointer;z-index:2}
+.up-ico{font-size:44px;margin-bottom:10px}
+.up-t{font-size:15px;font-weight:700;margin-bottom:5px}
+.up-d{font-size:12px;color:var(--muted);margin-bottom:14px}
+.tags{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.tag{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+.tag-cfo{background:#dbeafe;color:#1d4ed8}.tag-cfoc{background:#fae8ff;color:#7e22ce}
+.tag-adab{background:#dcfce7;color:#15803d}.tag-adagro{background:#fef3c7;color:#92400e}
+
+/* PROGRESS */
+.prog{background:var(--card);border:1px solid var(--borda);border-radius:10px;padding:16px 20px;margin-bottom:16px;display:none}
+.prog-t{font-size:13px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.prog-bar{height:7px;background:var(--borda);border-radius:4px;overflow:hidden;margin-bottom:8px}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--verde),var(--verde3));border-radius:4px;transition:width .4s}
+.prog-log{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);max-height:90px;overflow-y:auto;line-height:1.7}
+
+/* FC */
+.fc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-bottom:18px}
+.fc{background:var(--card);border:1px solid var(--borda);border-radius:9px;padding:12px 14px;display:flex;align-items:center;gap:10px}
+.fc-ico{font-size:24px;flex-shrink:0}
+.fc-name{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fc-st{font-size:11px;font-weight:600;margin-top:2px}
+.fc-st.ok{color:#15803d}.fc-st.err{color:#dc2626}.fc-st.proc{color:var(--amarelo)}
+
+/* KPIs */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}
+.kpi{background:var(--card);border:1px solid var(--borda);border-radius:11px;padding:18px 20px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi.v1::before{background:var(--verde)}.kpi.v2::before{background:var(--roxo)}.kpi.v3::before{background:var(--azul)}.kpi.v4::before{background:var(--amarelo)}.kpi.v5::before{background:#15803d}
+.kpi-l{font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px}
+.kpi-v{font-size:28px;font-weight:700;line-height:1;margin-bottom:2px}
+.kpi-s{font-size:11px;color:var(--muted)}
+
+/* TOOLBAR */
+.tbar{background:var(--card);border:1px solid var(--borda);border-radius:10px;padding:12px 16px;display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.tbar input,.tbar select{background:var(--bg);border:1px solid var(--borda);color:var(--texto);border-radius:7px;padding:7px 11px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;outline:none;transition:border-color .2s}
+.tbar input:focus,.tbar select:focus{border-color:var(--verde3)}
+.tbar input.srch{flex:1;min-width:200px}
+.sep{width:1px;height:26px;background:var(--borda)}
+
+/* BOTÕES */
+.btn{padding:8px 16px;border-radius:8px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.btn-g{background:var(--verde);color:#fff}.btn-g:hover{background:var(--verde2)}
+.btn-xl{background:#16a34a;color:#fff}.btn-xl:hover{background:#15803d}
+.btn-pdf{background:#dc2626;color:#fff}.btn-pdf:hover{background:#b91c1c}
+.btn-gs{background:var(--google);color:#fff}.btn-gs:hover{background:#2563eb}
+.btn-out{background:transparent;border:1px solid var(--borda);color:var(--texto)}.btn-out:hover{border-color:var(--verde3)}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-loading{opacity:.7;pointer-events:none}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead{background:#f8fafc}
+thead th{padding:9px 13px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);border-bottom:2px solid var(--borda);white-space:nowrap;cursor:pointer;user-select:none}
+thead th:hover{color:var(--verde)}
+tbody tr{border-bottom:1px solid #f1f5f9;transition:background .1s}
+tbody tr:hover{background:rgba(82,183,136,.04)}
+td{padding:8px 13px;vertical-align:middle}
+td.mono{font-family:'IBM Plex Mono',monospace;font-size:11px}
+.no-data{text-align:center;padding:50px;color:var(--muted);font-size:13px}
+.ib{padding:3px 8px;border-radius:5px;background:none;cursor:pointer;font-size:11px;border:1px solid var(--borda)}
+.ib:hover{background:var(--bg)}
+.ib-del{border-color:#fecaca;color:#dc2626}.ib-del:hover{background:#fee2e2}
+
+/* PAG */
+.pag{display:flex;align-items:center;gap:5px;padding:10px 14px;border-top:1px solid var(--borda);justify-content:flex-end;flex-wrap:wrap}
+.pgb{width:27px;height:27px;border-radius:5px;border:1px solid var(--borda);background:transparent;cursor:pointer;font-size:11px}
+.pgb:hover{background:var(--bg)}.pgb.active{background:var(--verde);color:#fff;border-color:var(--verde);font-weight:700}.pgb:disabled{opacity:.3;cursor:not-allowed}
+
+/* FORM */
+.fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:11px}
+.fld label{font-size:10px;color:var(--muted);display:block;margin-bottom:3px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.5px}
+.fld input,.fld select{width:100%;padding:8px 10px;border:1px solid var(--borda);border-radius:7px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;background:var(--bg);outline:none}
+.fld input:focus,.fld select:focus{border-color:var(--verde3)}
+
+/* REL */
+.rel-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.rel-card{background:var(--card);border:1px solid var(--borda);border-radius:11px;padding:20px}
+.rel-card h3{font-size:13px;font-weight:700;margin-bottom:14px}
+.br{margin-bottom:9px}
+.br-label{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px}
+.br-track{height:6px;background:var(--borda);border-radius:3px}
+.br-fill{height:100%;border-radius:3px}
+
+/* MODAL */
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:none;align-items:center;justify-content:center;padding:16px}
+.mbg.open{display:flex;animation:fi .2s}
+@keyframes fi{from{opacity:0}}
+.modal{background:var(--card);border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;padding:26px;box-shadow:var(--shm)}
+.modal-t{font-size:16px;font-weight:700;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center}
+.mc{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted)}
+.dg{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.di{background:var(--bg);border-radius:8px;padding:11px 13px}
+.di.full{grid-column:1/-1}
+.di .dk{font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:.7px;text-transform:uppercase;margin-bottom:3px}
+.di .dv{font-size:13px;font-weight:600}
+
+/* TOAST */
+#toast{position:fixed;bottom:20px;right:20px;z-index:500;display:flex;flex-direction:column;gap:7px}
+.t{background:var(--texto);color:#fff;border-radius:10px;padding:11px 16px;font-size:12px;display:flex;align-items:center;gap:8px;animation:ti .25s ease;min-width:230px;box-shadow:var(--shm)}
+.t.ok{background:var(--verde)}.t.err{background:#dc2626}.t.inf{background:#0369a1}.t.gs{background:var(--google)}
+@keyframes ti{from{transform:translateX(50px);opacity:0}}
+.spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* GS STATUS BAR */
+.gs-status{display:flex;align-items:center;gap:8px;padding:8px 14px;background:#e8f0fe;border:1px solid #93c5fd;border-radius:8px;font-size:12px;margin-bottom:14px;display:none}
+.gs-status.show{display:flex}
+.gs-status a{color:var(--google);font-weight:700;text-decoration:none}
+.gs-status a:hover{text-decoration:underline}
+
+/* SHEETS PANEL */
+.btn-sheets{background:#0f9d58;color:#fff}.btn-sheets:hover{background:#0b8043}
+.sheets-panel{background:#e8f5e9;border:1.5px solid #a5d6a7;border-radius:10px;padding:14px 18px;margin-bottom:20px;display:none}
+.sheets-panel.open{display:block}
+.sheets-panel h4{font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:7px}
+.sheets-url-row{display:flex;gap:8px;margin-bottom:10px}
+.sheets-url-row input{flex:1;padding:7px 12px;border:1px solid #a5d6a7;border-radius:7px;font-family:'IBM Plex Mono',monospace;font-size:11px;outline:none;background:#fff}
+.sheets-url-row input:focus{border-color:#0f9d58}
+.sheets-btns{display:flex;gap:8px;flex-wrap:wrap}
+.sheets-status{font-size:11px;margin-top:8px;min-height:18px;font-family:'IBM Plex Mono',monospace}
+.sheets-status.ok{color:#0b8043}.sheets-status.err{color:#dc2626}.sheets-status.proc{color:#d97706}
+
+@media(max-width:900px){.kpi-row{grid-template-columns:repeat(2,1fr)}.rel-grid{grid-template-columns:1fr}.wrap{padding:14px 16px}.tabs{padding:0 14px}}
+
+/* ====== LOGIN ====== */
+#login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#1a3a2a 0%,#2d6a4f 50%,#1a2332 100%);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px}
+.login-box{background:#fff;border-radius:20px;padding:40px 44px;width:100%;max-width:420px;box-shadow:0 24px 80px rgba(0,0,0,.4);position:relative;overflow:hidden}
+.login-box::before{content:'';position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--verde),var(--verde3))}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo .ico{font-size:52px;display:block;margin-bottom:10px}
+.login-logo h1{font-size:20px;font-weight:800;color:var(--verde);margin-bottom:4px}
+.login-logo p{font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+.login-fld{margin-bottom:16px}
+.login-fld label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;font-family:'IBM Plex Mono',monospace}
+.login-fld input{width:100%;padding:11px 14px;border:1.5px solid var(--borda);border-radius:9px;font-family:'IBM Plex Sans',sans-serif;font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s;background:#fafafa}
+.login-fld input:focus{border-color:var(--verde3);box-shadow:0 0 0 3px rgba(82,183,136,.15);background:#fff}
+.login-err{background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:12px;color:#dc2626;margin-bottom:14px;display:none;align-items:center;gap:8px}
+.login-err.show{display:flex}
+.btn-login{width:100%;padding:13px;background:linear-gradient(135deg,var(--verde),var(--verde2));color:#fff;border:none;border-radius:9px;font-family:'IBM Plex Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:4px}
+.btn-login:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(45,106,79,.4)}
+.btn-login:active{transform:none}
+.login-footer{text-align:center;margin-top:20px;font-size:11px;color:var(--muted)}
+
+/* ====== USER MENU ====== */
+.user-pill{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:5px 12px 5px 8px;font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:all .2s;position:relative}
+.user-pill:hover{background:rgba(255,255,255,.25)}
+.user-avatar{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.user-name{font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-role{font-size:9px;opacity:.7;font-family:'IBM Plex Mono',monospace}
+.user-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid var(--borda);border-radius:12px;box-shadow:var(--shm);min-width:200px;overflow:hidden;display:none;z-index:300}
+.user-pill:hover .user-dropdown,.user-pill.open .user-dropdown{display:block}
+.ud-header{padding:14px 16px;border-bottom:1px solid var(--borda);background:#f8fafc}
+.ud-name{font-size:13px;font-weight:700;color:var(--texto)}
+.ud-email{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+.ud-item{padding:10px 16px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--texto);transition:background .15s}
+.ud-item:hover{background:var(--bg)}
+.ud-item.danger{color:#dc2626}
+.ud-item.danger:hover{background:#fee2e2}
+.ud-sep{height:1px;background:var(--borda)}
+
+/* ====== MODAL USUÁRIOS ====== */
+.usr-list{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;margin-bottom:16px}
+.usr-item{background:var(--bg);border:1px solid var(--borda);border-radius:9px;padding:11px 14px;display:flex;align-items:center;gap:12px}
+.usr-avatar-lg{width:36px;height:36px;border-radius:50%;background:var(--verde);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0}
+.usr-info{flex:1}
+.usr-info .un{font-size:13px;font-weight:700}
+.usr-info .ur{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+.usr-actions{display:flex;gap:6px}
+.badge-admin{background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+.badge-user{background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+
+/* ====== CHANGE PASSWORD ====== */
+#modal-senha{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;align-items:center;justify-content:center;padding:16px}
+#modal-senha.open{display:flex}
+#modal-usuarios{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;align-items:center;justify-content:center;padding:16px}
+#modal-usuarios.open{display:flex}
+</style>
+</head>
+<body>
+
+<!-- ====== TELA DE LOGIN ====== -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <span class="ico">🍇</span>
+      <h1>Sistema CFO / CFOC</h1>
+      <p>ADAB · ADAGRO · Livro Uva</p>
+    </div>
+    <div class="login-err" id="login-err"><span>⚠️</span><span id="login-err-msg">Usuário ou senha incorretos.</span></div>
+    <div class="login-fld">
+      <label>Usuário</label>
+      <input type="text" id="li-user" placeholder="Digite seu usuário" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('li-pass').focus()">
+    </div>
+    <div class="login-fld">
+      <label>Senha</label>
+      <input type="password" id="li-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')fazerLogin()">
+    </div>
+    <button class="btn-login" onclick="fazerLogin()">Entrar →</button>
+    <div class="login-footer">Acesso restrito · Dados armazenados localmente</div>
+  </div>
+</div>
+
+<!-- ====== APP (oculto até login) ====== -->
+<div id="app" style="display:none">
+
+<!-- ====== MODAL ALTERAR SENHA ====== -->
+<div id="modal-senha">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-t"><span>🔒 Alterar Senha</span><button class="mc" onclick="fechaModalSenha()">✕</button></div>
+    <div class="login-fld"><label>Senha Atual</label><input type="password" id="s-atual" placeholder="Senha atual"></div>
+    <div class="login-fld"><label>Nova Senha</label><input type="password" id="s-nova" placeholder="Mínimo 6 caracteres"></div>
+    <div class="login-fld"><label>Confirmar Nova Senha</label><input type="password" id="s-conf" placeholder="Repita a nova senha"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-out btn-sm" onclick="fechaModalSenha()">Cancelar</button>
+      <button class="btn btn-g" onclick="alterarSenha()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== MODAL GERENCIAR USUÁRIOS ====== -->
+<div id="modal-usuarios">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-t"><span>👥 Gerenciar Usuários</span><button class="mc" onclick="fechaModalUsuarios()">✕</button></div>
+    <div class="usr-list" id="usr-list"></div>
+    <div style="background:var(--bg);border:1px solid var(--borda);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:12px;color:var(--verde)">➕ Novo Usuário</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="login-fld" style="margin:0"><label>Usuário</label><input type="text" id="nu-user" placeholder="nome.sobrenome"></div>
+        <div class="login-fld" style="margin:0"><label>Senha</label><input type="password" id="nu-pass" placeholder="Mínimo 6 caracteres"></div>
+        <div class="login-fld" style="margin:0"><label>Nome completo</label><input type="text" id="nu-nome" placeholder="Nome para exibição"></div>
+        <div class="login-fld" style="margin:0"><label>Perfil</label>
+          <select id="nu-role" style="width:100%;padding:11px 14px;border:1.5px solid var(--borda);border-radius:9px;font-size:14px;outline:none;background:#fafafa">
+            <option value="user">Usuário</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-g btn-sm" onclick="criarUsuario()">➕ Criar Usuário</button>
+    </div>
+  </div>
+</div>
+
+<div class="hd">
+  <div class="hd-l">
+    <div class="hd-ico">🍇</div>
+    <div>
+      <div class="hd-title">Sistema CFO / CFOC — Livro Uva</div>
+      <div class="hd-sub">ADAB · ADAGRO · Controle Fitossanitário · 100% Local</div>
+    </div>
+  </div>
+  <div class="hd-r">
+    <span class="hd-clock" id="clock"></span>
+    <div class="user-pill" id="user-pill" onclick="this.classList.toggle('open')">
+      <div class="user-avatar" id="user-avatar">?</div>
+      <div>
+        <div class="user-name" id="user-name-hd">—</div>
+        <div class="user-role" id="user-role-hd">—</div>
+      </div>
+      <span style="font-size:10px;opacity:.6">▾</span>
+      <div class="user-dropdown">
+        <div class="ud-header">
+          <div class="ud-name" id="ud-fullname">—</div>
+          <div class="ud-email" id="ud-username">—</div>
+        </div>
+        <div class="ud-item" onclick="abrirModalSenha()">🔒 Alterar senha</div>
+        <div class="ud-item" id="ud-gerenciar" onclick="abrirModalUsuarios()" style="display:none">👥 Gerenciar usuários</div>
+        <div class="ud-sep"></div>
+        <div class="ud-item danger" onclick="fazerLogout()">🚪 Sair</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="setTab('import')" id="tab-import">➕ Adicionar</div>
+  <div class="tab" onclick="setTab('cfo')" id="tab-cfo">📋 Livro CFO</div>
+  <div class="tab" onclick="setTab('cfoc')" id="tab-cfoc">📗 Controle CFOC</div>
+  <div class="tab" onclick="setTab('rel')" id="tab-rel">📊 Relatórios</div>
+  
+</div>
+
+<!-- ====== ABAS DE ANO (visíveis nas abas CFO e CFOC) ====== -->
+<div id="tabs-ano-wrap">
+  <div class="tabs-ano" id="tabs-ano"></div>
+</div>
+
+<div class="wrap">
+
+<!-- ====== ADICIONAR ====== -->
+<div id="pane-import">
+
+
+  <!-- Chave API (discreta) -->
+
+
+  <!-- Layout: PDF viewer + Formulário lado a lado -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+
+  <!-- COLUNA ESQUERDA: Visualizador PDF -->
+  <div class="card" style="padding:0;position:sticky;top:84px">
+    <div class="card-h" style="justify-content:space-between">
+      <h2>📂 PDF do Certificado</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="btn-fechar-pdf" class="btn btn-out btn-sm" style="display:none;color:#dc2626;border-color:#dc2626" onclick="fecharPDF()">✕ Fechar PDF</button>
+        <button class="btn btn-out btn-sm" onclick="document.getElementById('fin-viewer').click()">📂 Abrir PDF</button>
+      </div>
+      <input type="file" id="fin-viewer" accept=".pdf" style="display:none" onchange="abrirPDFViewer(this)">
+    </div>
+    <div id="pdf-viewer-wrap" style="height:420px;overflow-y:auto;background:#525659;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px">
+      <div style="font-size:48px">📄</div>
+      <div style="color:#ccc;font-size:14px;font-weight:600">Nenhum PDF aberto</div>
+      <div style="color:#999;font-size:12px">Clique em "Abrir PDF" para selecionar um certificado da pasta de rede</div>
+      <button class="btn btn-g" onclick="document.getElementById('fin-viewer').click()" style="margin-top:8px">📂 Selecionar PDF</button>
+    </div>
+    <div id="pdf-nav" style="display:none;padding:10px 16px;background:#3a3a3a;border-radius:0 0 0 0;display:flex;align-items:center;justify-content:center;gap:16px">
+      <button onclick="pdfPagAnterior()" style="background:none;border:1px solid #666;color:#fff;border-radius:6px;padding:4px 12px;cursor:pointer">◀</button>
+      <span id="pdf-nav-txt" style="color:#ccc;font-size:12px;font-family:'IBM Plex Mono',monospace">Pág 1 / 1</span>
+      <button onclick="pdfPagProxima()" style="background:none;border:1px solid #666;color:#fff;border-radius:6px;padding:4px 12px;cursor:pointer">▶</button>
+    </div>
+    <!-- Área OCR + colar texto -->
+    <div style="padding:14px 16px;border-top:1px solid var(--borda)">
+      <!-- Botões principais -->
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button id="btn-ocr" class="btn btn-g" style="flex:1;font-size:13px;padding:10px" onclick="lerOCR()">
+          🔍 Ler automaticamente
+        </button>
+        <button class="btn btn-out" style="flex:1;font-size:13px;padding:10px" onclick="abrirDigitacaoRapida()">
+          ✏️ Digitar manualmente
+        </button>
+      </div>
+      <div id="ocr-status" style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px;display:none"></div>
+      <!-- Debug: ver texto bruto -->
+      <div id="debug-txt-wrap" style="display:none;margin-bottom:8px">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Texto extraído (debug):</div>
+        <textarea id="debug-txt" rows="6" readonly style="width:100%;font-size:10px;font-family:monospace;background:#f5f5f5;border:1px solid var(--borda);border-radius:6px;padding:8px;color:#333;resize:vertical"></textarea>
+      </div>
+      <!-- Fallback colar texto -->
+      <details style="margin-top:4px">
+        <summary style="font-size:11px;color:var(--muted);cursor:pointer;user-select:none">📋 Ou cole o texto manualmente</summary>
+        <div style="margin-top:8px">
+          <textarea id="txt-pdf" rows="5" placeholder="Cole aqui o texto copiado do PDF..." 
+            style="width:100%;padding:10px;border:1px solid var(--borda);border-radius:8px;font-size:11px;font-family:'IBM Plex Mono',monospace;background:var(--bg);color:var(--texto);resize:vertical;outline:none;line-height:1.5"></textarea>
+          <div style="display:flex;gap:8px;margin-top:6px;justify-content:flex-end">
+            <button class="btn btn-out btn-sm" onclick="document.getElementById('txt-pdf').value=''">🗑 Limpar</button>
+            <button class="btn btn-g btn-sm" onclick="extrairDoPDF()">⚡ Extrair dados</button>
+          </div>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <!-- COLUNA DIREITA: Formulário -->
+  <div class="card" style="padding:0">
+    <div class="card-h"><h2>✏️ Preencher Dados</h2></div>
+    <div style="padding:18px 20px">
+
+
+
+      <div style="display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap">
+        <label style="font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="m-tipo" value="CFO" checked onchange="toggleTipo()"> CFO</label>
+        <label style="font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="m-tipo" value="CFOC" onchange="toggleTipo()"> CFOC</label>
+      </div>
+      <!-- CAMPOS CFO -->
+      <div id="form-cfo-fields">
+        <div class="fg">
+          <div class="fld"><label>Órgão *</label><select id="m-org"><option>ADAB</option><option>ADAGRO</option></select></div>
+          <div class="fld"><label>Data CFO *</label><input type="date" id="m-data"></div>
+          <div class="fld"><label>Variedade *</label><input id="m-var" placeholder="Ex: UVA – ARRA 15"></div>
+          <div class="fld"><label>Produtor *</label><input id="m-prod" placeholder="Nome do produtor"></div>
+          <div class="fld"><label>Cod. da UP *</label><input id="m-up" placeholder="Ex: 2918407374012001" style="font-family:'IBM Plex Mono',monospace;font-size:11px"></div>
+          <div class="fld"><label>Nº CFO *</label><input id="m-ncfo" placeholder="Ex: 2920004139" style="font-family:'IBM Plex Mono',monospace"></div>
+          <div class="fld"><label>Quantidade *</label><input type="number" id="m-qtd" placeholder="8.8" step="0.0001"></div>
+          <div class="fld"><label>Unidade</label><select id="m-un"><option>Ton.</option><option>ton</option><option>Kg</option><option>Caixas</option></select></div>
+          <div class="fld"><label>Observação</label><input id="m-obs" placeholder="Observações..."></div>
+        </div>
+      </div>
+
+      <!-- CAMPOS CFOC -->
+      <div id="form-cfoc-fields" style="display:none">
+        <div class="fg">
+          <div class="fld"><label>Órgão *</label><select id="m-org2"><option>ADAB</option><option>ADAGRO</option></select></div>
+          <div class="fld"><label>Data CFOC *</label><input type="date" id="m-data2"></div>
+          <div class="fld"><label>Nº do CFOC *</label><input id="m-ncfoc" placeholder="Ex: 29250105" style="font-family:'IBM Plex Mono',monospace"></div>
+          <div class="fld"><label>Nº do Lote *</label><input id="m-lote" placeholder="Ex: 29184070052250001" style="font-family:'IBM Plex Mono',monospace;font-size:11px"></div>
+          <div class="fld"><label>Qtd. Total CFOC (ton) *</label><input type="number" id="m-qtdc" placeholder="48" step="0.01"></div>
+          <div class="fld"><label>Variedade</label><input id="m-var2" placeholder="Ex: UVA - Vitis vinifera"></div>
+          <div class="fld"><label>Produto</label><input id="m-prod2" placeholder="UVA" value="UVA"></div>
+          <div class="fld"><label>Destino</label><input id="m-dest" placeholder="BRASIL"></div>
+        </div>
+
+        <!-- Tabela de CFOs vinculados -->
+        <div style="margin-top:16px;background:var(--card);border:1px solid var(--borda);border-radius:10px;padding:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-size:13px;font-weight:700;color:var(--texto)">📋 CFOs Vinculados a este CFOC</span>
+            <button class="btn btn-out btn-sm" onclick="addLinhaCFO()">+ Adicionar CFO</button>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px" id="tbl-cfos-vinc">
+            <thead>
+              <tr style="background:rgba(45,106,79,.1)">
+                <th style="padding:6px 4px;width:32px;text-align:center;font-size:10px;color:var(--verde)">PDF</th>
+                <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--verde)">Nº CFO</th>
+                <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--verde)">PRODUTOR</th>
+                <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--verde)">COD. UP</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;color:var(--verde)">QUANTID.</th>
+                <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--verde)">UNIDADE</th>
+                <th style="padding:6px 4px;width:30px"></th>
+              </tr>
+            </thead>
+            <tbody id="body-cfos-vinc"></tbody>
+          </table>
+          <div style="margin-top:8px;font-size:11px;color:var(--muted)" id="total-cfos-vinc"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+        <button class="btn btn-out" onclick="limpar()">🗑 Limpar</button>
+        <button class="btn btn-out" style="color:var(--verde);border-color:var(--verde)" onclick="addManualContinuar()">✓ Adicionar e continuar</button>
+        <button class="btn btn-g" onclick="addManual()">➕ Adicionar</button>
+      </div>
+    </div>
+  </div><!-- fim coluna direita -->
+  </div><!-- fim grid -->
+</div><!-- fim pane-import -->
+
+<!-- ====== CFO ====== -->
+<div id="pane-cfo" style="display:none">
+  <div class="kpi-row" id="kpi-cfo"></div>
+  <div class="tbar">
+    <input type="text" class="srch" id="s-cfo" placeholder="🔍  Buscar produtor, Nº CFO, variedade, UP...">
+    <select id="f-var"><option value="">Variedade</option></select>
+    <select id="f-prod"><option value="">Produtor</option></select>
+    <select id="f-oc"><option value="">Órgão</option><option>ADAB</option><option>ADAGRO</option></select>
+    <div class="sep"></div>
+
+    <button class="btn btn-xl" onclick="xlsCFO()">⬇ Excel</button>
+    <button class="btn btn-pdf" onclick="pdfCFO()">📄 PDF</button>
+  </div>
+  <div class="card">
+    <div class="card-h"><h2>📋 Planilha de Acompanhamento — Livro Uva (CFO)</h2><span class="ct" id="ct-cfo">0 registros</span></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th onclick="srt('cfo','data')">DATA CFO ↕</th>
+          <th onclick="srt('cfo','variedade')">VARIEDADE ↕</th>
+          <th onclick="srt('cfo','produtor')">PRODUTOR ↕</th>
+          <th onclick="srt('cfo','codUp')">COD. DA UP ↕</th>
+          <th onclick="srt('cfo','nCfo')">Nº CFO ↕</th>
+          <th onclick="srt('cfo','quantidade')">QUANTID. ↕</th>
+          <th onclick="srt('cfo','unidade')">UNIDADE ↕</th>
+          <th onclick="srt('cfo','orgao')">ÓRGÃO ↕</th>
+          <th>OBSERVAÇÃO</th><th>AÇÕES</th>
+        </tr></thead>
+        <tbody id="tb-cfo"></tbody>
+      </table>
+    </div>
+    <div class="pag" id="pg-cfo"></div>
+  </div>
+</div>
+
+<!-- ====== CFOC ====== -->
+<div id="pane-cfoc" style="display:none">
+  <div class="kpi-row" id="kpi-cfoc"></div>
+  <div class="tbar">
+    <input type="text" class="srch" id="s-cfoc" placeholder="🔍  Buscar Nº CFO, lote, CFOC, produtor...">
+    <select id="f-oc2"><option value="">Órgão</option><option>ADAB</option><option>ADAGRO</option></select>
+    <select id="f-dest"><option value="">Destino</option></select>
+    <div class="sep"></div>
+
+    <button class="btn btn-xl" onclick="xlsCFOC()">⬇ Excel</button>
+    <button class="btn btn-pdf" onclick="pdfCFOC()">📄 PDF</button>
+  </div>
+  <div class="card">
+    <div class="card-h"><h2>📗 Controle de CFOC — ADAB</h2><span class="ct" id="ct-cfoc">0 registros</span></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th onclick="srt('cfoc','data')">DATA ↕</th>
+          <th onclick="srt('cfoc','nCfo')">Nº CFO ↕</th>
+          <th onclick="srt('cfoc','quantidade')">QUANTID ↕</th>
+          <th onclick="srt('cfoc','unidade')">UNIDADE ↕</th>
+          <th onclick="srt('cfoc','nLote')">Nº DO LOTE ↕</th>
+          <th onclick="srt('cfoc','produto')">PRODUTO ↕</th>
+          <th onclick="srt('cfoc','nCfoc')">Nº DE CFOC ↕</th>
+          <th onclick="srt('cfoc','qtdCfoc')">QUANTID ↕</th>
+          <th onclick="srt('cfoc','variedade')">VARIEDADE ↕</th>
+          <th onclick="srt('cfoc','destino')">DESTINO ↕</th>
+          <th>ÓRGÃO</th><th>AÇÕES</th>
+        </tr></thead>
+        <tbody id="tb-cfoc"></tbody>
+      </table>
+    </div>
+    <div class="pag" id="pg-cfoc"></div>
+  </div>
+</div>
+
+<!-- ====== RELATÓRIOS ====== -->
+<div id="pane-rel" style="display:none">
+  <div class="tbar">
+    <label style="font-size:12px;font-weight:600">Período:</label>
+    <input type="date" id="r-de" style="padding:7px 11px;border:1px solid var(--borda);border-radius:7px;font-size:12px;background:var(--bg);outline:none">
+    <label style="font-size:12px">até</label>
+    <input type="date" id="r-ate" style="padding:7px 11px;border:1px solid var(--borda);border-radius:7px;font-size:12px;background:var(--bg);outline:none">
+    <button class="btn btn-out btn-sm" onclick="renderRel()">🔄 Atualizar</button>
+    <div class="sep"></div>
+
+    <button class="btn btn-xl" onclick="xlsGeral()">⬇ Excel Completo</button>
+    <button class="btn btn-pdf" onclick="pdfGeral()">📄 Relatório PDF</button>
+  </div>
+  <div class="kpi-row" id="kpi-rel"></div>
+  <div class="rel-grid">
+    <div class="rel-card"><h3>🍇 Top Produtores — Volume (ton.)</h3><div id="top-prod"></div></div>
+    <div class="rel-card"><h3>🌿 Volume por Variedade</h3><div id="top-var"></div></div>
+  </div>
+  <div class="card" style="padding:0">
+    <div class="card-h"><h2>📅 Volume Mensal — CFO</h2></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>MÊS/ANO</th><th>QTD. CFO</th><th>VOLUME (TON.)</th><th>PRODUTORES</th><th>% TOTAL</th></tr></thead>
+        <tbody id="tb-mensal"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card" style="padding:0">
+    <div class="card-h"><h2>📦 Resumo CFOC por Lote</h2></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Nº LOTE</th><th>Nº CFOC</th><th>DATA</th><th>PRODUTO</th><th>QTD. CFOs</th><th>VOL. TOTAL</th><th>VARIEDADE</th><th>DESTINO</th></tr></thead>
+        <tbody id="tb-lotes"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+</div><!-- /wrap -->
+
+<!-- MODAL -->
+<div class="mbg" id="mbg">
+  <div class="modal">
+    <div class="modal-t"><span id="mt-t">Detalhes</span><button class="mc" onclick="fechaModal()">✕</button></div>
+    <div id="mt-c"></div>
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-out btn-sm" onclick="fechaModal()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal digitação rápida -->
+<div id="modal-dig" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0;font-size:16px">✏️ Digitação Rápida</h3>
+      <button onclick="fechaDigitacao()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted)">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="fld" style="grid-column:1/-1">
+        <label>Órgão</label>
+        <select id="dg-org"><option>ADAB</option><option>ADAGRO</option></select>
+      </div>
+      <div class="fld"><label>Nº CFO</label><input id="dg-ncfo" placeholder="Ex: 2625055066" style="font-family:'IBM Plex Mono',monospace"></div>
+      <div class="fld"><label>Data</label><input type="date" id="dg-data"></div>
+      <div class="fld" style="grid-column:1/-1"><label>Produtor</label><input id="dg-prod" placeholder="Nome completo do produtor"></div>
+      <div class="fld" style="grid-column:1/-1"><label>Cód. UP</label><input id="dg-up" placeholder="Ex: 26126042363230004" style="font-family:'IBM Plex Mono',monospace;font-size:11px"></div>
+      <div class="fld" style="grid-column:1/-1"><label>Variedade</label><input id="dg-var" placeholder="Ex: UVA VITÓRIA"></div>
+      <div class="fld"><label>Quantidade</label><input type="number" id="dg-qtd" placeholder="8.20" step="0.0001"></div>
+      <div class="fld"><label>Unidade</label>
+        <select id="dg-un"><option>Ton.</option><option>ton</option><option>Toneladas</option><option>Fruto(a)/Tonelada(s)</option><option>Kg</option></select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+      <button class="btn btn-out btn-sm" onclick="fechaDigitacao()">Cancelar</button>
+      <button class="btn btn-g" onclick="confirmarDigitacao()">✓ Preencher campos</button>
+    </div>
+  </div>
+</div>
+<!-- Modal digitação rápida CFO vinculado -->
+<div id="modal-dig-vinc" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1001;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0;font-size:15px">✏️ Digitar CFO Vinculado</h3>
+      <button onclick="fechaDigVinc()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted)">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="fld" style="grid-column:1/-1"><label>Nº CFO</label><input id="dv-ncfo" placeholder="Ex: 2625055066" style="font-family:'IBM Plex Mono',monospace"></div>
+      <div class="fld" style="grid-column:1/-1"><label>Produtor</label><input id="dv-prod" placeholder="Nome completo"></div>
+      <div class="fld" style="grid-column:1/-1"><label>Cód. UP</label><input id="dv-up" placeholder="Ex: 26126042363230004" style="font-family:'IBM Plex Mono',monospace;font-size:11px"></div>
+      <div class="fld"><label>Quantidade</label><input type="number" id="dv-qtd" placeholder="8.20" step="0.0001"></div>
+      <div class="fld"><label>Unidade</label>
+        <select id="dv-un"><option>ton</option><option>Ton.</option><option>Toneladas</option><option>Fruto(a)/Tonelada(s)</option><option>Kg</option></select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+      <button class="btn btn-out btn-sm" onclick="fechaDigVinc()">Cancelar</button>
+      <button class="btn btn-g" onclick="confirmarDigVinc()">✓ Preencher linha</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// =================== DADOS ===================
+let regs = JSON.parse(localStorage.getItem('cfo_v5')||'[]');
+const save = ()=>localStorage.setItem('cfo_v5',JSON.stringify(regs));
+
+
+// Demo data
+if(!regs.length){
+  regs=[
+    {id:'d1',tipo:'CFO',orgao:'ADAB',data:'2020-01-07',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004139',quantidade:8.8,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
+    {id:'d2',tipo:'CFO',orgao:'ADAB',data:'2020-01-07',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004140',quantidade:3.3,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
+    {id:'d3',tipo:'CFO',orgao:'ADAB',data:'2020-01-08',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004141',quantidade:2.75,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
+    {id:'d4',tipo:'CFO',orgao:'ADAB',data:'2020-01-08',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004142',quantidade:7.15,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
+    {id:'d5',tipo:'CFO',orgao:'ADAB',data:'2020-01-10',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004143',quantidade:8.8,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
+    {id:'d6',tipo:'CFO',orgao:'ADAB',data:'2020-01-10',variedade:'UVA – ARRA 15',produtor:'IBACEM AGRÍCOLA',codUp:'2918407374012001',nCfo:'2920004144',quantidade:2.75,unidade:'Ton.',produto:'UVA',nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:''},
+    {id:'d7',tipo:'CFOC',orgao:'ADAB',data:'2025-01-03',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250001',nCfo:'2924077805',quantidade:30,unidade:'ton',produto:'UVA',nLote:'29184070052250001',nCfoc:'29250105',qtdCfoc:30,destino:'BRASIL',obs:''},
+    {id:'d8',tipo:'CFOC',orgao:'ADAB',data:'2025-01-06',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250002',nCfo:'2625002484',quantidade:12,unidade:'ton',produto:'UVA',nLote:'29184070052250002',nCfoc:'29250342',qtdCfoc:48,destino:'BRASIL',obs:''},
+    {id:'d9',tipo:'CFOC',orgao:'ADAB',data:'2025-01-06',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250002',nCfo:'2625002485',quantidade:12,unidade:'ton',produto:'UVA',nLote:'29184070052250002',nCfoc:'29250342',qtdCfoc:48,destino:'BRASIL',obs:''},
+    {id:'d10',tipo:'CFOC',orgao:'ADAB',data:'2025-01-06',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250002',nCfo:'2625002486',quantidade:24,unidade:'ton',produto:'UVA',nLote:'29184070052250002',nCfoc:'29250342',qtdCfoc:48,destino:'BRASIL',obs:''},
+    {id:'d11',tipo:'CFOC',orgao:'ADAB',data:'2025-01-07',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250003',nCfo:'2625000477',quantidade:8,unidade:'ton',produto:'UVA',nLote:'29184070052250003',nCfoc:'29250366',qtdCfoc:58,destino:'BRASIL',obs:''},
+    {id:'d12',tipo:'CFOC',orgao:'ADAB',data:'2025-01-07',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250003',nCfo:'2625000478',quantidade:12,unidade:'ton',produto:'UVA',nLote:'29184070052250003',nCfoc:'29250366',qtdCfoc:58,destino:'BRASIL',obs:''},
+    {id:'d13',tipo:'CFOC',orgao:'ADAB',data:'2025-01-07',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250003',nCfo:'2625000476',quantidade:18,unidade:'ton',produto:'UVA',nLote:'29184070052250003',nCfoc:'29250366',qtdCfoc:58,destino:'BRASIL',obs:''},
+    {id:'d14',tipo:'CFOC',orgao:'ADAB',data:'2025-01-07',variedade:'UVA - Vitis vinifera',produtor:'IBACEM AGRÍCOLA',codUp:'29184070052250003',nCfo:'2625000475',quantidade:20,unidade:'ton',produto:'UVA',nLote:'29184070052250003',nCfoc:'29250366',qtdCfoc:58,destino:'BRASIL',obs:''},
+  ];
+  save();
+}
+
+
+// =================== STATE ===================
+let sf={cfo:'data',cfoc:'data'},sd={cfo:1,cfoc:1},pg={cfo:1,cfoc:1};
+const PP=15;
+
+setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleString('pt-BR'),1000);
+document.getElementById('clock').textContent=new Date().toLocaleString('pt-BR');
+
+// =================== DIGITAÇÃO RÁPIDA CFO VINCULADO ===================
+let _trDigVinc = null;
+
+function abrirDigitacaoVinc(btn){
+  _trDigVinc = btn.closest('tr');
+  ['dv-ncfo','dv-prod','dv-up','dv-qtd'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  const modal = document.getElementById('modal-dig-vinc');
+  modal.style.display = 'flex';
+  document.getElementById('dv-ncfo').focus();
+}
+
+function fechaDigVinc(){
+  document.getElementById('modal-dig-vinc').style.display = 'none';
+  _trDigVinc = null;
+}
+
+function confirmarDigVinc(){
+  if(!_trDigVinc) return;
+  const g  = id => document.getElementById(id)?.value?.trim() || '';
+  const sv = (cls, v) => { if(!v) return; const el=_trDigVinc.querySelector(cls); if(el) el.value=v; };
+  sv('.vinc-ncfo', g('dv-ncfo'));
+  sv('.vinc-prod', g('dv-prod'));
+  sv('.vinc-up',   g('dv-up'));
+  sv('.vinc-qtd',  g('dv-qtd'));
+  const unEl = _trDigVinc.querySelector('.vinc-un');
+  const un = g('dv-un');
+  if(unEl && un){ [...unEl.options].forEach(o=>{ if(un===o.value) o.selected=true; }); }
+  atualizaTotalVinc();
+  fechaDigVinc();
+  toast('CFO preenchido','ok');
+}
+
+// =================== DIGITAÇÃO RÁPIDA ===================
+function abrirDigitacaoRapida(){
+  // Pré-preencher com tipo atual
+  const tipo = [...document.querySelectorAll('input[name=m-tipo]')].find(r=>r.checked)?.value||'CFO';
+  // Resetar campos
+  ['dg-ncfo','dg-prod','dg-up','dg-var','dg-qtd'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('dg-data').value = document.getElementById('m-data')?.value || '';
+  const modal = document.getElementById('modal-dig');
+  modal.style.display = 'flex';
+  document.getElementById('dg-ncfo').focus();
+}
+
+function fechaDigitacao(){
+  document.getElementById('modal-dig').style.display = 'none';
+}
+
+function confirmarDigitacao(){
+  const g = id => document.getElementById(id)?.value?.trim() || '';
+  const tipo = [...document.querySelectorAll('input[name=m-tipo]')].find(r=>r.checked)?.value||'CFO';
+  const sv = (id,v) => { if(!v) return; const el=document.getElementById(id); if(el) el.value=v; };
+
+  if(tipo === 'CFO'){
+    document.getElementById('m-org').value = g('dg-org');
+    sv('m-data',  g('dg-data'));
+    sv('m-ncfo',  g('dg-ncfo'));
+    sv('m-prod',  g('dg-prod'));
+    sv('m-up',    g('dg-up'));
+    sv('m-var',   g('dg-var'));
+    sv('m-qtd',   g('dg-qtd'));
+    const unEl = document.getElementById('m-un');
+    const un = g('dg-un');
+    if(unEl && un){ [...unEl.options].forEach(o=>{ if(un===o.value) o.selected=true; }); }
+  } else {
+    document.getElementById('m-org2').value = g('dg-org');
+    sv('m-data2', g('dg-data'));
+    sv('m-ncfoc', g('dg-ncfo'));
+    sv('m-var2',  g('dg-var'));
+  }
+
+  fechaDigitacao();
+  toast('Campos preenchidos','ok');
+}
+
+// =================== TABS ===================
+// =================== ANO ATIVO ===================
+let anoAtivo = 'todos'; // 'todos' ou '2024', '2025', etc.
+
+function getAnosComDados(tipo){
+  // tipo: 'CFO', 'CFOC', ou null para ambos
+  const fonte = tipo ? regs.filter(r=>r.tipo===tipo) : regs;
+  const anos = [...new Set(fonte.map(r=>(r.data||'').slice(0,4)).filter(a=>a&&a.length===4))];
+  return anos.sort((a,b)=>b-a); // mais recente primeiro
+}
+
+function renderTabsAno(tipo){
+  const wrap = document.getElementById('tabs-ano-wrap');
+  const cont = document.getElementById('tabs-ano');
+
+  // Anos com dados no tipo atual (CFO ou CFOC)
+  const anos = getAnosComDados(tipo);
+
+  if(!anos.length){ wrap.style.display='none'; return; }
+
+  wrap.style.display = 'block';
+
+  // Contar registros por ano
+  const countPorAno = {};
+  regs.filter(r=>r.tipo===tipo).forEach(r=>{
+    const a=(r.data||'').slice(0,4);
+    if(a) countPorAno[a]=(countPorAno[a]||0)+1;
+  });
+  const total = Object.values(countPorAno).reduce((s,v)=>s+v,0);
+
+  cont.innerHTML = `
+    <span class="ano-label">Ano:</span>
+    <div class="tab-ano tab-ano-todos ${anoAtivo==='todos'?'active':''}" onclick="setAno('todos','${tipo}')">
+      Todos <span class="ano-badge">${total}</span>
+    </div>
+    ${anos.map(a=>`
+      <div class="tab-ano ${anoAtivo===a?'active':''}" onclick="setAno('${a}','${tipo}')">
+        ${a} <span class="ano-badge">${countPorAno[a]||0}</span>
+      </div>`).join('')}
+  `;
+}
+
+function setAno(ano, tipo){
+  anoAtivo = ano;
+  renderTabsAno(tipo);
+  if(tipo==='CFO'){ pg.cfo=1; renderCFO(); }
+  else { pg.cfoc=1; renderCFOC(); }
+}
+
+function setTab(t){
+  ['import','cfo','cfoc','rel'].forEach(x=>{
+    const pane=document.getElementById('pane-'+x);
+    const tab=document.getElementById('tab-'+x);
+    if(pane) pane.style.display=x===t?'':'none';
+    if(tab) tab.classList.toggle('active',x===t);
+  });
+  // Mostrar/ocultar abas de ano
+  const wrapAno = document.getElementById('tabs-ano-wrap');
+  if(t==='cfo'){
+    anoAtivo='todos'; popFiltros(); renderTabsAno('CFO'); renderCFO();
+  } else if(t==='cfoc'){
+    anoAtivo='todos'; popFiltros(); renderTabsAno('CFOC'); renderCFOC();
+  } else {
+    if(wrapAno) wrapAno.style.display='none';
+    if(t==='rel') renderRel();
+  }
+}
+
+// =================== EXTRAIR TEXTO DO PDF (PDF.js nativo) ===================
+let _pdfFileBuffer = null; // Guarda o ArrayBuffer do PDF aberto
+
+async function lerOCR(){
+  const btn    = document.getElementById('btn-ocr');
+  const status = document.getElementById('ocr-status');
+
+  // Usa o buffer do arquivo carregado, ou pdfDoc como fallback
+  if(!_pdfFileBuffer && !pdfDoc){
+    toast('Abra um PDF primeiro','err');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '\u23f3 Lendo texto do PDF...';
+  status.style.display = 'block';
+  status.textContent   = 'Extraindo texto...';
+
+  try {
+    let doc = pdfDoc;
+
+    // Preferir carregar direto do buffer (mais confiavel)
+    if(_pdfFileBuffer){
+      doc = await pdfjsLib.getDocument({data: new Uint8Array(_pdfFileBuffer)}).promise;
+    }
+
+    let textoTotal = '';
+    for(let p = 1; p <= doc.numPages; p++){
+      const page    = await doc.getPage(p);
+      const content = await page.getTextContent();
+      let lastY = null;
+      for(const item of content.items){
+        if(lastY !== null && Math.abs(item.transform[5] - lastY) > 5) textoTotal += '\n';
+        textoTotal += item.str + ' ';
+        lastY = item.transform[5];
+      }
+      textoTotal += '\n\n';
+    }
+
+    textoTotal = textoTotal.trim();
+
+    if(!textoTotal || textoTotal.length < 20){
+      status.textContent = '\u26a0\ufe0f PDF sem texto digital — preencha manualmente ou cole o texto.';
+      btn.disabled = false;
+      btn.innerHTML = '\ud83d\udd0d Ler certificado automaticamente';
+      return;
+    }
+
+    // Mostrar debug
+    const ta = document.getElementById('txt-pdf');
+    if(ta) ta.value = textoTotal;
+    const dbgWrap = document.getElementById('debug-txt-wrap');
+    const dbg     = document.getElementById('debug-txt');
+    if(dbg && dbgWrap){ dbg.value = textoTotal; dbgWrap.style.display='block'; }
+
+    status.textContent = 'Preenchendo campos...';
+    extrairDoPDFTxt(textoTotal);
+
+    status.textContent = '\u2705 Campos preenchidos — revise se necessario';
+    setTimeout(() => { status.style.display = 'none'; }, 4000);
+
+  } catch(e){
+    status.textContent = '\u274c Erro: ' + e.message;
+    toast('Erro ao ler PDF: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '\ud83d\udd0d Ler certificado automaticamente';
+  }
+}
+
+
+// =================== EXTRAIR DADOS DO TEXTO COLADO ===================
+function extrairDoPDF(){
+  const txt = document.getElementById('txt-pdf').value.trim();
+  if(!txt){ toast('Cole o texto do PDF primeiro','err'); return; }
+  extrairDoPDFTxt(txt);
+}
+
+function extrairDoPDFTxt(txt){
+
+  const g = (patterns) => {
+    for(const p of patterns){
+      const m = txt.match(p);
+      if(m && m[1]) return m[1].trim();
+    }
+    return '';
+  };
+
+  // Tipo e orgao
+  const isCFOC = /Consolidado|CFOC/i.test(txt);
+  const tipo   = isCFOC ? 'CFOC' : 'CFO';
+  const orgao  = /ADAGRO|Pernambuco/i.test(txt) ? 'ADAGRO' : 'ADAB';
+
+  document.querySelectorAll('input[name=m-tipo]').forEach(r => { r.checked = (r.value === tipo); });
+  toggleTipo();
+
+  // Data — pega primeira data de range "02/01/2026 a 02/01/2026"
+  const dataRaw = g([
+    /(\d{2}\/\d{2}\/\d{4})\s+a\s+\d{2}\/\d{2}\/\d{4}/,
+    /EMITIDO EM[:\s]+\w+\s*,?\s*(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i,
+    /Emiss[ao]o[:\s]+(\d{2}\/\d{2}\/\d{4})/i,
+    /(\d{2}\/\d{2}\/\d{4})/
+  ]);
+  const data = parseDataBR(dataRaw);
+
+  // Numero CFOC — "Consolidado No 292897432"
+  const nCfoc = g([
+    /Consolidado\s+N[o\xba\xb0\u00b0]\s*([\d]{6,12})/i,
+    /CFOC\s*N[o\xba\xb0\u00b0]\s*([\d]{6,12})/i,
+    /N[o\xba\xb0\u00b0]\s+de\s+CFOC[:\s]+([\d]{6,12})/i
+  ]);
+
+
+
+  // Produtor / Nome da UC
+  const produtor = g([
+    /Nome\s+da\s+UC[:\s]+([A-Z][^\r\n]{3,70})/i,
+    /Nome\s+Produtor[:\s]+([A-Z][^\r\n]{3,70})/i,
+    /Produtor[:\s]+([A-Z][^\r\n]{3,70})/i
+  ]);
+
+  // Variedade: "UVA - RUGBY / Vitis vinifera" -> "RUGBY"
+  const variedade = g([
+    /UVA\s*[-\u2013]\s*([A-Z][^\r\n\/]{2,40}?)(?:\s*\/|\s*$)/im,
+    /UVA\s*[-\u2013]\s*([A-Z][^\r\n]{2,40})/i,
+    /UVA\s+([A-Z]{3,20})/i
+  ]);
+
+  // Codigo UP / No da UP
+  const codUp = g([
+    /N[o\xba\xb0\u00b0]\s+da\s+UP[:\s]+([\d]{14,20})/i,
+    /C[o\xf3]digo\s+da\s+UP[:\s]+([\d]{14,20})/i,
+    /\b(29\d{14,17})\b/,
+    /\b(26\d{14,17})\b/
+  ]);
+
+  // No do Lote Exportacao
+  const nLote = g([
+    /N[o\xba\xb0\u00b0]\s+Lote\s+Exporta[^\r\n]*[\r\n]+\s*([\d]{10,20})/i,
+    /N[o\xba\xb0\u00b0]\s+(?:do\s+)?Lote[:\s]+([\d]{10,20})/i,
+    /Lote[:\s]+(29\d{12,}|26\d{12,})/i
+  ]);
+
+  // CFO individual — usa mesma funcao que o botao PDF das linhas vinculadas
+  const _cfoDados = extrairCFO(txt);
+  const nCfo = _cfoDados.nCfo;
+
+  // Quantidade
+  const qtdRaw = g([
+    /Quantidade[:\s]+([\d]+[.,][\d]{1,4})/i,
+    /([\d]+[.,][\d]{4})\s*(?:Fruto|Ton|ton|kg)/i
+  ]);
+  const quantidade = parseFloat((qtdRaw||'0').replace(',','.')) || '';
+
+  // Quantidade total CFOC
+  const qtdCfocRaw = g([
+    /Qtd\.?\s*(?:Total\s*)?CFOC[:\s]+([\d.,]+)/i,
+    /(?:Quantidade|Qtd)\.?\s+Total[:\s]+([\d.,]+)/i
+  ]);
+  const qtdCfoc = parseFloat((qtdCfocRaw||'0').replace(',','.')) || quantidade || '';
+
+  // Unidade
+  const unidade = g([
+    /Unidade[:\s]+([^\r\n]{3,30})/i,
+    /(Fruto\(a\)\/Tonelada\(s\))/i,
+    /(Toneladas?|ton\.?|Ton\.?|kg)/i
+  ]) || 'Ton.';
+
+  // Destino
+  const destino = g([
+    /Destino[:\s]+([A-Z][^\r\n]{2,30})/i,
+    /Pa[i\xed]s\s+(?:de\s+)?Destino[:\s]+([A-Z][^\r\n]{2,30})/i
+  ]);
+
+  const sv = (id, v) => {
+    if(v === '' || v === null || v === undefined) return;
+    const el = document.getElementById(id);
+    if(el) el.value = v;
+  };
+
+  if(tipo === 'CFO'){
+    document.getElementById('m-org').value = _cfoDados.orgao || orgao;
+    sv('m-data', data);
+    sv('m-var',  _cfoDados.variedade || variedade);
+    sv('m-prod', _cfoDados.produtor  || produtor);
+    sv('m-up',   _cfoDados.codUp     || codUp);
+    sv('m-ncfo', nCfo);
+    sv('m-qtd',  _cfoDados.quantidade || quantidade);
+    const unEl = document.getElementById('m-un');
+    const _un  = _cfoDados.unidade || unidade || 'Ton.';
+    if(unEl){ [...unEl.options].forEach(o=>{ if(_un.toLowerCase().includes(o.value.toLowerCase())) o.selected=true; }); }
+
+  } else {
+    document.getElementById('m-org2').value = orgao;
+    sv('m-data2', data);
+    sv('m-ncfoc', nCfoc);
+    sv('m-lote',  nLote || codUp);
+    sv('m-qtdc',  qtdCfoc);
+    sv('m-var2',  variedade || 'UVA');
+    sv('m-dest',  destino);
+
+    // Tabela de CFOs vinculados fica vazia — usuario preenche manualmente
+    document.getElementById('body-cfos-vinc').innerHTML = '';
+    atualizaTotalVinc();
+  }
+
+  const preenchidos = [nCfoc||nCfo, produtor, variedade, nLote||codUp, data].filter(Boolean).length;
+  if(preenchidos >= 3){
+    toast('Campos preenchidos — revise e adicione CFOs vinculados se necessario', 'ok');
+  } else if(preenchidos >= 1){
+    toast('Dados parciais — complete os campos restantes', 'inf');
+  } else {
+    toast('Nao foi possivel extrair dados — preencha manualmente', 'err');
+  }
+}
+
+function parseDataBR(str){
+  if(!str) return '';
+  const m1 = str.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if(m1) return m1[3]+'-'+m1[2]+'-'+m1[1];
+  const meses = {janeiro:'01',fevereiro:'02',marco:'03',abril:'04',maio:'05',junho:'06',
+    julho:'07',agosto:'08',setembro:'09',outubro:'10',novembro:'11',dezembro:'12'};
+  const m2 = str.match(/(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})/i);
+  if(m2){
+    const mes = meses[m2[2].toLowerCase().replace(/[^a-z]/g,'')];
+    if(mes) return m2[3]+'-'+mes+'-'+m2[1].padStart(2,'0');
+  }
+  return '';
+}
+
+// Upload PDF via IA removido
+
+
+// =================== PDF VIEWER ===================
+function fecharPDF(){
+  pdfDoc = null;
+  _pdfFileBuffer = null;
+  document.getElementById('fin-viewer').value = '';
+  document.getElementById('btn-fechar-pdf').style.display = 'none';
+  document.getElementById('pdf-nav').style.display = 'none';
+  document.getElementById('debug-txt-wrap').style.display = 'none';
+  const wrap = document.getElementById('pdf-viewer-wrap');
+  wrap.style.height = '420px';
+  wrap.style.overflowY = 'auto';
+  wrap.innerHTML = `
+    <div style="font-size:48px">📄</div>
+    <div style="color:#ccc;font-size:14px;font-weight:600">Nenhum PDF aberto</div>
+    <div style="color:#999;font-size:12px">Clique em "Abrir PDF" para selecionar um certificado</div>
+    <button class="btn btn-g" onclick="document.getElementById('fin-viewer').click()" style="margin-top:8px">📂 Selecionar PDF</button>`;
+}
+
+let pdfDoc=null, pdfPagAtual=1;
+
+// Configura worker PDF.js
+
+
+function abrirPDFViewer(input){
+  const file=input.files[0];
+  if(!file) return;
+  input.value='';
+  const reader=new FileReader();
+  reader.onload=async function(e){
+    _pdfFileBuffer = e.target.result.slice(0); // Salvar buffer para lerOCR
+    document.getElementById('btn-fechar-pdf').style.display = 'inline-flex';
+    // Abrir PDF para visualização
+    const wrap=document.getElementById('pdf-viewer-wrap');
+    wrap.innerHTML='<canvas id="pdf-canvas" style="max-width:100%;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,.5)"></canvas>';
+
+    try{
+      if(!window.pdfjsLib){
+        // Fallback: mostrar via object tag se PDF.js não carregou
+        const blob=new Blob([e.target.result],{type:'application/pdf'});
+        const url=URL.createObjectURL(blob);
+        wrap.innerHTML=`<iframe src="${url}" style="width:100%;height:700px;border:none;border-radius:0 0 12px 12px"></iframe>`;
+        return;
+      }
+      const typedArr=new Uint8Array(e.target.result);
+      pdfDoc=await pdfjsLib.getDocument({data:typedArr}).promise;
+      pdfPagAtual=1;
+      await renderPagina(pdfPagAtual);
+      const nav=document.getElementById('pdf-nav');
+      if(nav){ nav.style.display='flex'; }
+      atualizarNavPDF();
+    }catch(err){
+      // Fallback via blob URL
+      const blob=new Blob([e.target.result],{type:'application/pdf'});
+      const url=URL.createObjectURL(blob);
+      wrap.innerHTML=`<iframe src="${url}" style="width:100%;height:700px;border:none;border-radius:0 0 12px 12px"></iframe>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function renderPagina(num){
+  if(!pdfDoc) return;
+  const page=await pdfDoc.getPage(num);
+  const wrap=document.getElementById('pdf-viewer-wrap');
+  const scale=wrap.clientWidth/page.getViewport({scale:1}).width;
+  const viewport=page.getViewport({scale:Math.min(scale,2)});
+  const canvas=document.getElementById('pdf-canvas');
+  if(!canvas) return;
+  canvas.height=viewport.height;
+  canvas.width=viewport.width;
+  canvas.style.maxWidth='100%';
+  canvas.style.height='auto';
+  await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+  atualizarNavPDF();
+}
+
+function atualizarNavPDF(){
+  const el=document.getElementById('pdf-nav-txt');
+  if(el&&pdfDoc) el.textContent=`Pág ${pdfPagAtual} / ${pdfDoc.numPages}`;
+}
+
+async function pdfPagAnterior(){
+  if(!pdfDoc||pdfPagAtual<=1) return;
+  pdfPagAtual--;
+  await renderPagina(pdfPagAtual);
+}
+
+async function pdfPagProxima(){
+  if(!pdfDoc||pdfPagAtual>=pdfDoc.numPages) return;
+  pdfPagAtual++;
+  await renderPagina(pdfPagAtual);
+}
+
+function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=()=>rej(new Error('Falha leitura'));r.readAsDataURL(file);});}
+
+
+// =================== MANUAL ===================
+function toggleTipo(){
+  const t=[...document.querySelectorAll('input[name=m-tipo]')].find(r=>r.checked)?.value||'CFO';
+  document.getElementById('form-cfo-fields').style.display = t==='CFO'?'':'none';
+  document.getElementById('form-cfoc-fields').style.display = t==='CFOC'?'':'none';
+  if(t==='CFOC' && document.getElementById('body-cfos-vinc').children.length===0) addLinhaCFO();
+}
+
+// Adiciona linha na tabela de CFOs vinculados
+function addLinhaCFO(){
+  const tbody=document.getElementById('body-cfos-vinc');
+  const idx=tbody.children.length;
+  const tr=document.createElement('tr');
+  tr.id='cfo-vinc-'+idx;
+  tr.style.borderBottom='1px solid var(--borda)';
+  tr.innerHTML=`
+    <td style="padding:4px 2px;text-align:center">
+      <div style="display:flex;gap:3px;justify-content:center">
+        <label title="Abrir PDF do CFO" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;background:var(--verde);border-radius:6px;color:#fff;font-size:13px">
+          \u{1F4C4}<input type="file" accept="application/pdf" style="display:none" onchange="lerCFOVinculado(this)">
+        </label>
+        <button title="Digitar manualmente" onclick="abrirDigitacaoVinc(this)" style="width:26px;height:26px;background:var(--card);border:1px solid var(--borda);border-radius:6px;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;justify-content:center">✏️</button>
+      </div>
+    </td>
+    <td style="padding:4px 6px"><input class="vinc-ncfo" placeholder="N\xba CFO" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--bg);border:1px solid var(--borda);border-radius:6px;padding:4px 7px;color:var(--texto)" oninput="atualizaTotalVinc()"></td>
+    <td style="padding:4px 6px"><input class="vinc-prod" placeholder="Produtor" style="width:100%;background:var(--bg);border:1px solid var(--borda);border-radius:6px;padding:4px 7px;color:var(--texto);font-size:12px"></td>
+    <td style="padding:4px 6px"><input class="vinc-up" placeholder="C\xf3d. UP" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:10px;background:var(--bg);border:1px solid var(--borda);border-radius:6px;padding:4px 7px;color:var(--texto)"></td>
+    <td style="padding:4px 6px"><input class="vinc-qtd" type="number" placeholder="0.00" step="0.0001" style="width:80px;text-align:right;background:var(--bg);border:1px solid var(--borda);border-radius:6px;padding:4px 7px;color:var(--texto);font-size:12px" oninput="atualizaTotalVinc()"></td>
+    <td style="padding:4px 6px"><select class="vinc-un" style="background:var(--bg);border:1px solid var(--borda);border-radius:6px;padding:4px;color:var(--texto);font-size:12px"><option>ton</option><option>Ton.</option><option>Kg</option></select></td>
+    <td style="padding:4px 2px;text-align:center"><button onclick="this.closest('tr').remove();atualizaTotalVinc()" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:14px">\u2715</button></td>`;
+  tbody.appendChild(tr);
+}
+
+async function lerCFOVinculado(input){
+  const file = input.files[0];
+  if(!file) return;
+  const tr  = input.closest('tr');
+  const lbl = input.closest('label');
+  const origHTML = lbl.innerHTML;
+  lbl.textContent = '\u23f3';
+
+  try {
+    const ab  = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data: new Uint8Array(ab)}).promise;
+
+    let txt = '';
+    for(let p = 1; p <= pdf.numPages; p++){
+      const page    = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      let lastY = null;
+      for(const item of content.items){
+        if(lastY !== null && Math.abs(item.transform[5]-lastY) > 5) txt += '\n';
+        txt += item.str + ' ';
+        lastY = item.transform[5];
+      }
+    }
+
+    // Usa a mesma funcao extrairCFO que ja funciona para ADAB e ADAGRO
+    const d = extrairCFO(txt);
+
+    const sv = (cls, v) => {
+      if(!v && v !== 0) return;
+      const el = tr.querySelector(cls);
+      if(el) el.value = v;
+    };
+    sv('.vinc-ncfo', d.nCfo);
+    sv('.vinc-prod', d.produtor);
+    sv('.vinc-up',   d.codUp);
+    sv('.vinc-qtd',  d.quantidade);
+    const unEl = tr.querySelector('.vinc-un');
+    if(unEl){ [...unEl.options].forEach(o => {
+      if((d.unidade||'').toLowerCase().includes(o.value.toLowerCase())) o.selected = true;
+    }); }
+
+    atualizaTotalVinc();
+    lbl.textContent = '\u2705';
+    setTimeout(() => { lbl.innerHTML = origHTML; }, 2500);
+    toast('CFO ' + (d.nCfo || 'lido') + ' preenchido', 'ok');
+
+  } catch(e){
+    lbl.textContent = '\u274c';
+    toast('Erro ao ler PDF: ' + e.message, 'err');
+    setTimeout(() => { lbl.innerHTML = origHTML; }, 2500);
+  }
+}
+
+
+// Extrai campos de um CFO — compativel com ADAB e ADAGRO
+function extrairCFO(txt){
+  const g = (patterns) => {
+    for(const p of patterns){ const m=txt.match(p); if(m&&m[1]) return m[1].trim(); }
+    return '';
+  };
+
+  // Orgao
+  const orgao = /ADAGRO|Pernambuco|PERNAMBUCO/i.test(txt) ? 'ADAGRO' : 'ADAB';
+
+  // Nº CFO
+  // ADAB:   "Certificado Fitossanitário de Origem Nº 2926013701" — numero ao final da linha
+  // ADAGRO: "Número: 2625045189"
+  const nCfo = g([
+    /Certificado[^\r\n]*Origem[^\r\n]*?([\d]{7,12})/i,
+    /CFO\s*N[o\xba\xb0\u00b0]\s*([\d]{7,12})/i,
+    /N[u\xfa]mero[:\s]+([\d]{7,12})(?!\d)/i,
+    /ORIGEM\s+([\d]{7,12})(?!\d)/i
+  ]);
+
+  // Produtor
+  // ADAB:   "Nome Produtor FULANO" (sem dois pontos) ou "Nome Produtor: FULANO"
+  // ADAGRO: "Nome Produtor/Nome Empresarial:\nFULANO" ou primeira linha em maiusculas
+  const produtor = (() => {
+    // Regex unificado: "Nome Produtor" + opcional "/...:" + espaco/newline + nome
+    const m1 = txt.match(/Nome\s+Produtor(?:[^:\r\n]*:)?\s*[\r\n]*\s*([A-Z][^\r\n]{4,70})/i);
+    if(m1 && !/N[u\xfa]mero|Endere|Proprie/i.test(m1[1])) return m1[1].trim();
+    // Fallback ADAGRO: primeira linha toda em maiusculas que parece nome
+    const linhas = txt.split(/[\r\n]+/);
+    for(const l of linhas){
+      const t = l.trim();
+      if(t.length < 8 || t.length > 80) continue;
+      if(!/^[A-Z\xc0-\xdc]/.test(t)) continue;
+      if(/AGENCIA|DEFESA|ESTADO|CERTIF|ADAGRO|ADAB|PERNAMBUCO|BAHIA|FITOSS|ORIGEM|DADOS|DECLAR/i.test(t)) continue;
+      if(/^[A-Z\xc0-\xdc\s]+$/.test(t) && t.split(' ').length >= 2) return t;
+    }
+    return '';
+  })();
+
+  // Código UP — 16+ dígitos
+  const codUp = g([
+    /\b(26[\d]{13,17})\b/,
+    /\b(29[\d]{13,17})\b/
+  ]);
+
+  // Variedade
+  const variedade = (() => {
+    const m1 = txt.match(/UVA\s*[-\u2013]\s*([A-Z][^\r\n\/]{2,40}?)(?:\s*[-\/\s]*(?:Vitis|vitis)|\s*$)/im);
+    if(m1) return ('UVA - ' + m1[1]).trim().replace(/\s+/g,' ');
+    const m2 = txt.match(/UVA\s+([A-Za-z][^\r\n\-\/]{2,30}?)\s*[-\/]/i);
+    if(m2) return ('UVA - ' + m2[1]).trim();
+    return '';
+  })();
+
+  // Quantidade + Unidade — multiplas estrategias em cascata
+  const _qtdUn = (() => {
+    let m;
+    m = txt.match(/([\d]+[.,][\d]{1,4})\s+(Toneladas?|Fruto[^\s]*|ton\b)/i);
+    if(m) return {q: m[1], u: m[2]};
+    m = txt.match(/Quantidade[:\s]+([\d]+[.,][\d]{1,4})/i);
+    if(m) return {q: m[1], u: ''};
+    m = txt.match(/(?:spp\.|vitis|UVA\s+[A-Za-z])[^\d\r\n]{0,30}([\d]+[.,][\d]{2,4})/i);
+    if(m) return {q: m[1], u: ''};
+    m = txt.match(/\b(\d{1,4}[.,]\d{2,4})\b/);
+    if(m) return {q: m[1], u: ''};
+    return {q: '0', u: ''};
+  })();
+  const quantidade = parseFloat(_qtdUn.q.replace(',','.')) || '';
+  const unidade = _qtdUn.u || g([
+    /(Fruto\(a\)\/Tonelada\(s\))/i,
+    /(Toneladas?|ton\.?|kg)/i
+  ]) || 'ton';
+
+  return { nCfo, produtor, codUp, quantidade, unidade, orgao, variedade };
+}
+
+function atualizaTotalVinc(){
+  const qtds=[...document.querySelectorAll('.vinc-qtd')].map(i=>parseFloat(i.value)||0);
+  const total=qtds.reduce((s,v)=>s+v,0);
+  const n=qtds.filter(v=>v>0).length;
+  document.getElementById('total-cfos-vinc').innerHTML=
+    n>0?`<strong style="color:var(--verde)">${n} CFO(s) · Total: ${total.toFixed(4)} ton</strong>`:'';
+}
+
+function addManual(){
+  const g=id=>(document.getElementById(id)?.value?.trim()||'');
+  const tipo=[...document.querySelectorAll('input[name=m-tipo]')].find(r=>r.checked)?.value||'CFO';
+
+  if(tipo==='CFO'){
+    // Validar campos obrigatórios
+    if(!g('m-data'))    { toast('Informe a Data do CFO','err'); document.getElementById('m-data').focus(); return; }
+    if(!g('m-ncfo'))    { toast('Informe o Nº CFO','err'); document.getElementById('m-ncfo').focus(); return; }
+    if(!g('m-prod'))    { toast('Informe o Produtor','err'); document.getElementById('m-prod').focus(); return; }
+    if(!g('m-up'))      { toast('Informe o Código da UP','err'); document.getElementById('m-up').focus(); return; }
+    if(!g('m-var'))     { toast('Informe a Variedade','err'); document.getElementById('m-var').focus(); return; }
+    const qtd = parseFloat(g('m-qtd'));
+    if(!qtd || qtd <= 0){ toast('Informe a Quantidade corretamente','err'); document.getElementById('m-qtd').focus(); return; }
+
+    regs.push({id:'m_'+Date.now(),tipo:'CFO',orgao:g('m-org'),data:g('m-data'),
+      variedade:g('m-var'),produtor:g('m-prod'),codUp:g('m-up'),nCfo:g('m-ncfo'),
+      quantidade:qtd,unidade:g('m-un'),produto:'UVA',
+      nLote:'',nCfoc:'',qtdCfoc:0,destino:'',obs:g('m-obs')});
+    save();popFiltros();renderTabsAno('CFO');renderCFO();renderRel();toast('CFO adicionado ✓','ok');limpar();
+    return;
+  }
+
+  // CFOC — validar campos obrigatórios
+  if(!g('m-data2'))  { toast('Informe a Data do CFOC','err'); document.getElementById('m-data2').focus(); return; }
+  if(!g('m-ncfoc'))  { toast('Informe o Nº do CFOC','err'); document.getElementById('m-ncfoc').focus(); return; }
+  if(!g('m-lote'))   { toast('Informe o Nº do Lote','err'); document.getElementById('m-lote').focus(); return; }
+  const qtdCfocVal = parseFloat(g('m-qtdc'));
+  if(!qtdCfocVal || qtdCfocVal <= 0){ toast('Informe a Quantidade Total do CFOC','err'); document.getElementById('m-qtdc').focus(); return; }
+
+  const linhas=[...document.getElementById('body-cfos-vinc').querySelectorAll('tr')];
+  if(!linhas.length){toast('Adicione pelo menos 1 CFO vinculado','err');return;}
+
+  // Validar que todas as linhas têm Nº CFO e quantidade
+  let erroLinha = false;
+  linhas.forEach((tr, i) => {
+    const nCfo = tr.querySelector('.vinc-ncfo')?.value?.trim()||'';
+    const qtd  = parseFloat(tr.querySelector('.vinc-qtd')?.value)||0;
+    if(!nCfo){ toast(`Linha ${i+1}: informe o Nº CFO`,'err'); erroLinha=true; }
+    else if(!qtd){ toast(`Linha ${i+1}: informe a quantidade`,'err'); erroLinha=true; }
+  });
+  if(erroLinha) return;
+
+  const orgao=document.getElementById('m-org2').value;
+  const data=g('m-data2');
+  const nCfoc=g('m-ncfoc');
+  const nLote=g('m-lote');
+  const qtdCfoc=qtdCfocVal;
+  const variedade=g('m-var2');
+  const produto=g('m-prod2')||'UVA';
+  const destino=g('m-dest');
+
+  let adicionados=0;
+  linhas.forEach(tr=>{
+    const nCfo=tr.querySelector('.vinc-ncfo')?.value?.trim()||'';
+    const produtor=tr.querySelector('.vinc-prod')?.value?.trim()||'';
+    const codUp=tr.querySelector('.vinc-up')?.value?.trim()||'';
+    const quantidade=parseFloat(tr.querySelector('.vinc-qtd')?.value)||0;
+    const unidade=tr.querySelector('.vinc-un')?.value||'ton';
+    if(!nCfo) return;
+    regs.push({id:'m_'+Date.now()+'_'+adicionados,tipo:'CFOC',orgao,data,
+      variedade,produtor,codUp,nCfo,quantidade,unidade,produto,
+      nLote,nCfoc,qtdCfoc,destino,obs:''});
+    adicionados++;
+  });
+
+  if(!adicionados){toast('Informe o Nº CFO em pelo menos uma linha','err');return;}
+  save();popFiltros();renderTabsAno('CFOC');renderCFOC();renderRel();
+  toast(`CFOC com ${adicionados} CFO(s) adicionado ✓`,'ok');
+  limpar();
+}
+
+function addManualContinuar(){
+  // Salva o tipo atual antes de adicionar
+  const tipo = [...document.querySelectorAll('input[name=m-tipo]')].find(r=>r.checked)?.value||'CFO';
+  addManual();
+  // Após adicionar, limpa mas mantém tipo, orgao, variedade para próximo lançamento
+  const orgao    = document.getElementById('m-org')?.value || document.getElementById('m-org2')?.value;
+  const variedade= document.getElementById('m-var')?.value || document.getElementById('m-var2')?.value;
+  limpar();
+  // Restaurar tipo
+  document.querySelectorAll('input[name=m-tipo]').forEach(r=>{ r.checked=(r.value===tipo); });
+  toggleTipo();
+  // Restaurar orgão e variedade
+  setTimeout(()=>{
+    const orgEl = document.getElementById(tipo==='CFO'?'m-org':'m-org2');
+    if(orgEl && orgao) orgEl.value = orgao;
+    const varEl = document.getElementById(tipo==='CFO'?'m-var':'m-var2');
+    if(varEl && variedade) varEl.value = variedade;
+    // Focar no campo principal
+    const foco = document.getElementById(tipo==='CFO'?'m-ncfo':'m-ncfoc');
+    if(foco) foco.focus();
+  }, 50);
+}
+
+function limpar(){
+  ['m-data','m-var','m-prod','m-up','m-ncfo','m-qtd','m-obs',
+   'm-data2','m-var2','m-prod2','m-lote','m-ncfoc','m-qtdc','m-dest'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';});
+  const tbody=document.getElementById('body-cfos-vinc');
+  if(tbody){tbody.innerHTML='';document.getElementById('total-cfos-vinc').innerHTML='';}
+}
+
+// =================== FILTROS ===================
+function popFiltros(){
+  const set=(id,vals,lbl)=>{const sel=document.getElementById(id);const prev=sel.value;sel.innerHTML=`<option value="">${lbl}</option>`+vals.map(v=>`<option>${v}</option>`).join('');sel.value=prev;};
+  set('f-var',[...new Set(regs.filter(r=>r.tipo==='CFO').map(r=>r.variedade).filter(Boolean))].sort(),'Variedade');
+  set('f-prod',[...new Set(regs.filter(r=>r.tipo==='CFO').map(r=>r.produtor).filter(Boolean))].sort(),'Produtor');
+  set('f-dest',[...new Set(regs.filter(r=>r.tipo==='CFOC').map(r=>r.destino).filter(Boolean))].sort(),'Destino');
+}
+
+// =================== RENDER CFO ===================
+function renderCFO(){
+  let d=regs.filter(r=>r.tipo==='CFO');
+  // Filtro de ano
+  if(anoAtivo && anoAtivo!=='todos') d=d.filter(r=>(r.data||'').startsWith(anoAtivo));
+  const q=document.getElementById('s-cfo').value.toLowerCase();
+  const fv=document.getElementById('f-var').value,fp=document.getElementById('f-prod').value,fo=document.getElementById('f-oc').value;
+  if(q) d=d.filter(r=>[r.nCfo,r.produtor,r.variedade,r.codUp].join(' ').toLowerCase().includes(q));
+  if(fv) d=d.filter(r=>r.variedade===fv);if(fp) d=d.filter(r=>r.produtor===fp);if(fo) d=d.filter(r=>r.orgao===fo);
+  d.sort((a,b)=>{const av=a[sf.cfo]||'',bv=b[sf.cfo]||'';return av<bv?-sd.cfo:av>bv?sd.cfo:0;});
+  // Label do ano no cabeçalho
+  const anoLabel = anoAtivo && anoAtivo!=='todos' ? ` — ${anoAtivo}` : '';
+  document.getElementById('ct-cfo').textContent=`${d.length} registros${anoLabel}`;
+  const vol=d.reduce((s,r)=>s+(parseFloat(r.quantidade)||0),0);
+  document.getElementById('kpi-cfo').innerHTML=`
+    <div class="kpi v1"><div class="kpi-l">Total CFO</div><div class="kpi-v">${d.length}</div><div class="kpi-s">certificados</div></div>
+    <div class="kpi v2"><div class="kpi-l">Volume Total</div><div class="kpi-v">${vol.toFixed(2)}</div><div class="kpi-s">toneladas</div></div>
+    <div class="kpi v3"><div class="kpi-l">Produtores</div><div class="kpi-v">${new Set(d.map(r=>r.produtor)).size}</div><div class="kpi-s">distintos</div></div>
+    <div class="kpi v4"><div class="kpi-l">UPs</div><div class="kpi-v">${new Set(d.map(r=>r.codUp)).size}</div><div class="kpi-s">cadastradas</div></div>
+    <div class="kpi v5"><div class="kpi-l">Média/CFO</div><div class="kpi-v">${d.length?(vol/d.length).toFixed(2):0}</div><div class="kpi-s">ton por CFO</div></div>`;
+  const ini=(pg.cfo-1)*PP,pag=d.slice(ini,ini+PP),tb=document.getElementById('tb-cfo');
+  if(!pag.length){tb.innerHTML=`<tr><td colspan="10" class="no-data">Nenhum CFO. Importe PDFs ou adicione manualmente.</td></tr>`;document.getElementById('pg-cfo').innerHTML='';return;}
+  tb.innerHTML=pag.map(r=>`<tr>
+    <td class="mono">${fmtD(r.data)}</td><td>${r.variedade||'—'}</td>
+    <td><strong>${r.produtor||'—'}</strong></td>
+    <td class="mono" style="font-size:10px">${r.codUp||'—'}</td>
+    <td class="mono"><strong>${r.nCfo||'—'}</strong></td>
+    <td class="mono"><strong>${parseFloat(r.quantidade||0).toFixed(4)}</strong></td>
+    <td>${r.unidade||'—'}</td>
+    <td><span class="tag tag-${(r.orgao||'').toLowerCase()}">${r.orgao||'—'}</span></td>
+    <td style="font-size:11px;color:var(--muted)">${r.obs||''}</td>
+    <td><div style="display:flex;gap:4px">
+      <button class="ib" title="Ver detalhes" onclick="verDet('${r.id}')" style="border-color:#93c5fd;color:#1d4ed8;padding:4px 9px">👁</button>
+      <button class="ib" title="Baixar PDF deste CFO" onclick="pdfUnitario('${r.id}')" style="border-color:#fca5a5;color:#dc2626;padding:4px 9px">⬇ PDF</button>
+      <button class="ib ib-del" title="Excluir" onclick="del('${r.id}')">🗑</button>
+    </div></td>
+  </tr>`).join('');
+  renderPag('pg-cfo',d.length,pg.cfo,p=>{pg.cfo=p;renderCFO();});
+}
+
+// =================== RENDER CFOC ===================
+function renderCFOC(){
+  let d=regs.filter(r=>r.tipo==='CFOC');
+  // Filtro de ano
+  if(anoAtivo && anoAtivo!=='todos') d=d.filter(r=>(r.data||'').startsWith(anoAtivo));
+  const q=document.getElementById('s-cfoc').value.toLowerCase(),fo=document.getElementById('f-oc2').value,fd=document.getElementById('f-dest').value;
+  if(q) d=d.filter(r=>[r.nCfo,r.nCfoc,r.nLote,r.produtor,r.variedade,r.destino].join(' ').toLowerCase().includes(q));
+  if(fo) d=d.filter(r=>r.orgao===fo);if(fd) d=d.filter(r=>r.destino===fd);
+  d.sort((a,b)=>{
+    const ka=a.nLote||a.nCfoc||a.data||'', kb=b.nLote||b.nCfoc||b.data||'';
+    if(ka!==kb) return ka<kb?-1:1;
+    return (a.data||'')<(b.data||'')?-1:1;
+  });
+  const anoLabel = anoAtivo && anoAtivo!=='todos' ? ` — ${anoAtivo}` : '';
+  document.getElementById('ct-cfoc').textContent=`${d.length} registros${anoLabel}`;
+  const vol=d.reduce((s,r)=>s+(parseFloat(r.quantidade)||0),0),nC=new Set(d.map(r=>r.nCfoc).filter(Boolean)).size;
+  document.getElementById('kpi-cfoc').innerHTML=`
+    <div class="kpi v1"><div class="kpi-l">CFOs Vinc.</div><div class="kpi-v">${d.length}</div><div class="kpi-s">registros</div></div>
+    <div class="kpi v2"><div class="kpi-l">CFOCs</div><div class="kpi-v">${nC}</div><div class="kpi-s">certificados</div></div>
+    <div class="kpi v3"><div class="kpi-l">Volume</div><div class="kpi-v">${vol.toFixed(2)}</div><div class="kpi-s">toneladas</div></div>
+    <div class="kpi v4"><div class="kpi-l">Lotes</div><div class="kpi-v">${new Set(d.map(r=>r.nLote).filter(Boolean)).size}</div><div class="kpi-s">distintos</div></div>
+    <div class="kpi v5"><div class="kpi-l">Destinos</div><div class="kpi-v">${new Set(d.map(r=>r.destino).filter(Boolean)).size}</div><div class="kpi-s">distintos</div></div>`;
+
+  // Agrupa por lote/cfoc
+  const lm={};
+  d.forEach(r=>{const k=r.nLote||r.nCfoc||r.data;if(!lm[k])lm[k]=[];lm[k].push(r);});
+  const la=Object.values(lm),ini=(pg.cfoc-1)*PP,pag=la.slice(ini,ini+PP),tb=document.getElementById('tb-cfoc');
+  if(!pag.length){tb.innerHTML=`<tr><td colspan="12" class="no-data">Nenhum CFOC.</td></tr>`;document.getElementById('pg-cfoc').innerHTML='';return;}
+
+  // Usa rowspan para mesclar células do grupo
+  let html='';
+  pag.forEach((g,gi)=>{
+    const n=g.length; // número de linhas do grupo
+    const r0=g[0];   // primeiro item do grupo
+    const bgGrupo=gi%2===0?'background:#f8fffe':'background:#fff';
+
+    g.forEach((r,i)=>{
+      html+=`<tr style="${bgGrupo};border-bottom:${i===n-1?'2px solid #c8e6c9':'1px solid #f1f5f9'}">`;
+
+      // DATA — mesclada (rowspan)
+      if(i===0) html+=`<td class="mono" rowspan="${n}" style="vertical-align:middle;background:rgba(45,106,79,.06);font-weight:700;border-right:1px solid #c8e6c9">${fmtD(r.data)}</td>`;
+
+      // Nº CFO — individual
+      html+=`<td class="mono">${r.nCfo||'—'}</td>`;
+      html+=`<td class="mono"><strong>${parseFloat(r.quantidade||0).toFixed(2)}</strong></td>`;
+      html+=`<td style="font-size:11px">${r.unidade||'—'}</td>`;
+
+      // Nº DO LOTE — mesclado
+      if(i===0) html+=`<td class="mono" rowspan="${n}" style="vertical-align:middle;color:var(--verde);font-weight:700;font-size:10px;background:rgba(45,106,79,.04);border-right:1px solid #c8e6c9;text-align:center">${r.nLote||'—'}</td>`;
+
+      // PRODUTO — mesclado
+      if(i===0) html+=`<td rowspan="${n}" style="vertical-align:middle;text-align:center;background:rgba(45,106,79,.04);border-right:1px solid #c8e6c9">${r.produto||'UVA'}</td>`;
+
+      // Nº DE CFOC — mesclado
+      if(i===0) html+=`<td class="mono" rowspan="${n}" style="vertical-align:middle;text-align:center;background:rgba(45,106,79,.06);border-right:1px solid #c8e6c9"><strong style="color:#1d4ed8">${r.nCfoc||'—'}</strong></td>`;
+
+      // QUANTID CFOC — mesclado
+      if(i===0) html+=`<td class="mono" rowspan="${n}" style="vertical-align:middle;text-align:center;background:rgba(45,106,79,.04);border-right:1px solid #c8e6c9"><strong>${parseFloat(r.qtdCfoc||0).toFixed(2)}</strong></td>`;
+
+      // VARIEDADE — mesclada
+      if(i===0) html+=`<td rowspan="${n}" style="vertical-align:middle;font-size:11px;background:rgba(45,106,79,.02);border-right:1px solid #c8e6c9">${r.variedade||'—'}</td>`;
+
+      // DESTINO — mesclado
+      if(i===0) html+=`<td rowspan="${n}" style="vertical-align:middle;text-align:center;background:rgba(45,106,79,.04);border-right:1px solid #c8e6c9"><strong>${r.destino||'—'}</strong></td>`;
+
+      // ÓRGÃO — mesclado
+      if(i===0) html+=`<td rowspan="${n}" style="vertical-align:middle;text-align:center;background:rgba(45,106,79,.02);border-right:1px solid #c8e6c9"><span class="tag tag-${(r.orgao||'').toLowerCase()}">${r.orgao||'—'}</span></td>`;
+
+      // AÇÕES — coluna mesclada, só na primeira linha do grupo
+      if(i===0){
+        html+=`<td rowspan="${n}" style="vertical-align:middle;text-align:center;padding:6px 4px">
+          <div style="display:flex;flex-direction:column;gap:5px;align-items:center">
+            <button class="ib" title="Ver detalhes" onclick="verDet('${r0.id}')">👁</button>
+            <button class="ib" title="Baixar PDF deste CFOC" onclick="pdfCFOC('${r0.nCfoc||r0.id}')" style="border-color:#fca5a5;color:#dc2626;padding:4px 9px;font-size:11px">⬇ PDF</button>
+            <button class="ib ib-del" title="Excluir grupo" onclick="delGrupo('${r0.nLote||r0.nCfoc}')">🗑</button>
+          </div></td>`;
+      }
+      html+=`</tr>`;
+    });
+
+    // Linha separadora entre grupos
+    html+=`<tr><td colspan="12" style="height:4px;background:linear-gradient(90deg,#d8f3dc,transparent);padding:0"></td></tr>`;
+  });
+
+  tb.innerHTML=html;
+  renderPag('pg-cfoc',la.length,pg.cfoc,p=>{pg.cfoc=p;renderCFOC();});
+}
+
+// =================== RELATÓRIO ===================
+function renderRel(){
+  const rDe=document.getElementById('r-de').value,rAte=document.getElementById('r-ate').value;
+  let cfos=regs.filter(r=>r.tipo==='CFO'),cfocs=regs.filter(r=>r.tipo==='CFOC');
+  if(rDe){cfos=cfos.filter(r=>r.data>=rDe);cfocs=cfocs.filter(r=>r.data>=rDe);}
+  if(rAte){cfos=cfos.filter(r=>r.data<=rAte);cfocs=cfocs.filter(r=>r.data<=rAte);}
+  const vCfo=cfos.reduce((s,r)=>s+(parseFloat(r.quantidade)||0),0);
+  const vCfoc=cfocs.reduce((s,r)=>s+(parseFloat(r.quantidade)||0),0);
+  const nC=new Set(cfocs.map(r=>r.nCfoc).filter(Boolean)).size;
+  document.getElementById('kpi-rel').innerHTML=`
+    <div class="kpi v1"><div class="kpi-l">Total CFO</div><div class="kpi-v">${cfos.length}</div><div class="kpi-s">certificados</div></div>
+    <div class="kpi v2"><div class="kpi-l">Total CFOC</div><div class="kpi-v">${nC}</div><div class="kpi-s">certificados</div></div>
+    <div class="kpi v3"><div class="kpi-l">Vol. CFO</div><div class="kpi-v">${vCfo.toFixed(2)}</div><div class="kpi-s">toneladas</div></div>
+    <div class="kpi v4"><div class="kpi-l">Vol. CFOC</div><div class="kpi-v">${vCfoc.toFixed(2)}</div><div class="kpi-s">toneladas</div></div>
+    <div class="kpi v5"><div class="kpi-l">Registros</div><div class="kpi-v">${regs.length}</div><div class="kpi-s">total geral</div></div>`;
+  const pp={};cfos.forEach(r=>{if(r.produtor)pp[r.produtor]=(pp[r.produtor]||0)+(parseFloat(r.quantidade)||0);});
+  const tP=Object.entries(pp).sort((a,b)=>b[1]-a[1]).slice(0,7),mP=tP[0]?.[1]||1;
+  document.getElementById('top-prod').innerHTML=tP.map(([p,v])=>`<div class="br"><div class="br-label"><span style="font-weight:600;font-size:11px">${p}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px">${v.toFixed(2)} ton</span></div><div class="br-track"><div class="br-fill" style="width:${(v/mP*100).toFixed(1)}%;background:var(--verde)"></div></div></div>`).join('')||'<p style="color:var(--muted);font-size:12px">Sem dados</p>';
+  const pv={};cfos.forEach(r=>{if(r.variedade)pv[r.variedade]=(pv[r.variedade]||0)+(parseFloat(r.quantidade)||0);});
+  const tV=Object.entries(pv).sort((a,b)=>b[1]-a[1]).slice(0,7),mV=tV[0]?.[1]||1;
+  document.getElementById('top-var').innerHTML=tV.map(([v,q])=>`<div class="br"><div class="br-label"><span style="font-weight:600;font-size:11px">${v}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px">${q.toFixed(2)} ton</span></div><div class="br-track"><div class="br-fill" style="width:${(q/mV*100).toFixed(1)}%;background:var(--azul)"></div></div></div>`).join('')||'<p style="color:var(--muted);font-size:12px">Sem dados</p>';
+  const pm={};cfos.forEach(r=>{if(r.data){const m=r.data.slice(0,7);if(!pm[m])pm[m]={n:0,v:0,ps:new Set()};pm[m].n++;pm[m].v+=(parseFloat(r.quantidade)||0);pm[m].ps.add(r.produtor);}});
+  const ms=Object.entries(pm).sort((a,b)=>a[0]<b[0]?-1:1),tot=ms.reduce((s,[,v])=>s+v.v,0)||1;
+  document.getElementById('tb-mensal').innerHTML=ms.map(([m,v])=>`<tr>
+    <td class="mono">${m}</td><td style="font-weight:700;text-align:center">${v.n}</td>
+    <td style="font-family:'IBM Plex Mono',monospace;color:var(--verde);font-weight:700;text-align:right">${v.v.toFixed(4)}</td>
+    <td style="text-align:center">${v.ps.size}</td>
+    <td style="text-align:right"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px">${(v.v/tot*100).toFixed(1)}%</span></td>
+  </tr>`).join('')||'<tr><td colspan="5" class="no-data">Sem dados</td></tr>';
+  const lm={};cfocs.forEach(r=>{const k=r.nLote||r.nCfoc;if(!lm[k])lm[k]={nLote:r.nLote,nCfoc:r.nCfoc,data:r.data,produto:r.produto,cfos:[],variedade:r.variedade,destino:r.destino};lm[k].cfos.push(r);});
+  document.getElementById('tb-lotes').innerHTML=Object.values(lm).map(l=>{const v=l.cfos.reduce((s,r)=>s+(parseFloat(r.quantidade)||0),0);return`<tr><td class="mono" style="font-size:10px">${l.nLote||'—'}</td><td class="mono"><strong>${l.nCfoc||'—'}</strong></td><td class="mono">${fmtD(l.data)}</td><td>${l.produto||'UVA'}</td><td style="text-align:center;font-weight:700">${l.cfos.length}</td><td class="mono" style="color:var(--verde);font-weight:700">${v.toFixed(2)}</td><td style="font-size:11px">${l.variedade||'—'}</td><td><strong>${l.destino||'—'}</strong></td></tr>`;}).join('')||'<tr><td colspan="8" class="no-data">Sem dados CFOC</td></tr>';
+}
+
+// =================== DETALHE ===================
+function verDet(id){
+  const r=regs.find(x=>x.id===id);if(!r)return;
+
+  // Se for CFOC, busca todos os CFOs do mesmo grupo
+  const grupo = r.tipo==='CFOC'
+    ? regs.filter(x=>x.tipo==='CFOC' && (r.nCfoc ? x.nCfoc===r.nCfoc : x.nLote===r.nLote && x.nLote))
+    : [r];
+  const volTotal = grupo.reduce((s,x)=>s+(parseFloat(x.quantidade)||0),0);
+
+  document.getElementById('mt-t').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px">
+      <span>${r.tipo==='CFO'?'📋':'📗'} ${r.tipo==='CFO'?'CFO':'CFOC'} Nº
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:14px">${r.tipo==='CFO'?r.nCfo:r.nCfoc||'—'}</span></span>
+      <span class="tag tag-${(r.orgao||'').toLowerCase()}" style="font-size:11px">${r.orgao||'—'}</span>
+    </div>`;
+
+  // ── Cabeçalho principal ──────────────────────────────────
+  let cabHTML='';
+  if(r.tipo==='CFOC'){
+    // CFOC: mostra todos os CFOs do grupo em mini-tabela no cabeçalho
+    const linhasCFO = grupo.map(x=>`
+      <tr style="border-bottom:1px solid #d1fae5">
+        <td style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;padding:6px 10px;color:#1d4ed8">${x.nCfo||'—'}</td>
+        <td style="font-size:13px;padding:6px 10px">${x.produtor||'—'}</td>
+        <td style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;padding:6px 10px;text-align:right">${parseFloat(x.quantidade||0).toFixed(2)}</td>
+        <td style="font-size:12px;padding:6px 6px;color:#555">${x.unidade||''}</td>
+      </tr>`).join('');
+    cabHTML=`
+      <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;margin-bottom:16px">
+        <div style="font-size:9px;color:#15803d;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+          CFOs vinculados — ${grupo.length} certificado(s) · Volume total: <strong>${volTotal.toFixed(4)} ton</strong>
+        </div>
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="background:rgba(45,106,79,.08)">
+            <th style="font-size:9px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;padding:4px 10px;text-align:left;color:#166534">Nº CFO</th>
+            <th style="font-size:9px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;padding:4px 10px;text-align:left;color:#166534">Produtor</th>
+            <th style="font-size:9px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;padding:4px 10px;text-align:right;color:#166534">Quantid.</th>
+            <th style="font-size:9px;padding:4px 6px;color:#166534">Un.</th>
+          </tr></thead>
+          <tbody>${linhasCFO}</tbody>
+        </table>
+      </div>`;
+  } else {
+    // CFO: cabeçalho simples de 3 colunas
+    cabHTML=`
+      <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div><div style="font-size:9px;color:#15803d;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Data do CFO</div>
+          <div style="font-size:16px;font-weight:700">${fmtD(r.data)}</div></div>
+        <div><div style="font-size:9px;color:#15803d;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Quantidade</div>
+          <div style="font-size:16px;font-weight:700">${parseFloat(r.quantidade||0).toFixed(4)} <span style="font-size:12px;font-weight:400">${r.unidade||''}</span></div></div>
+        <div><div style="font-size:9px;color:#15803d;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Órgão</div>
+          <div style="font-size:16px;font-weight:700">${r.orgao||'—'}</div></div>
+      </div>`;
+  }
+
+  document.getElementById('mt-c').innerHTML=cabHTML+`
+    <div class="dg">
+      ${r.tipo==='CFO'?`
+        <div class="di full"><div class="dk">Produtor</div><div class="dv" style="font-size:15px">${r.produtor||'—'}</div></div>
+        <div class="di"><div class="dk">Variedade / Produto</div><div class="dv">${r.variedade||r.produto||'—'}</div></div>
+        <div class="di"><div class="dk">Nº CFO</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;color:#1d4ed8">${r.nCfo||'—'}</div></div>
+        <div class="di full"><div class="dk">Código da UP</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#7e22ce">${r.codUp||'—'}</div></div>
+      `:`
+        <div class="di full"><div class="dk">Nº do Lote</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#92400e">${r.nLote||'—'}</div></div>
+        <div class="di"><div class="dk">Nº do CFOC</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;color:#7e22ce">${r.nCfoc||'—'}</div></div>
+        <div class="di"><div class="dk">Qtd. Total CFOC</div><div class="dv">${parseFloat(r.qtdCfoc||0).toFixed(2)} ton</div></div>
+        <div class="di"><div class="dk">Data</div><div class="dv">${fmtD(r.data)}</div></div>
+        <div class="di"><div class="dk">Variedade</div><div class="dv">${r.variedade||'—'}</div></div>
+        <div class="di"><div class="dk">Destino</div><div class="dv"><strong>${r.destino||'—'}</strong></div></div>
+        <div class="di"><div class="dk">Órgão</div><div class="dv">${r.orgao||'—'}</div></div>
+      `}
+      ${r.obs?`<div class="di full"><div class="dk">Observação</div><div class="dv" style="color:var(--muted)">${r.obs}</div></div>`:''}
+    </div>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--borda);display:flex;gap:8px;justify-content:flex-end">
+      ${r.tipo==='CFO'
+        ?`<button class="btn btn-pdf btn-sm" onclick="pdfUnitario('${r.id}');fechaModal()">⬇ Baixar PDF deste CFO</button>`
+        :`<button class="btn btn-pdf btn-sm" onclick="pdfCFOC('${r.nCfoc||r.id}');fechaModal()">⬇ Baixar PDF deste CFOC</button>`}
+    </div>`;
+  document.getElementById('mbg').classList.add('open');
+}
+function fechaModal(){document.getElementById('mbg').classList.remove('open');}
+
+// =================== PDF UNITÁRIO ===================
+function pdfUnitario(id){
+  const r=regs.find(x=>x.id===id);if(!r){toast('Registro não encontrado','err');return;}
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210, m=14, cw=W-m*2;
+  const verde=[45,106,79], preto=[26,35,50], cinza=[100,116,139], borda=[180,180,180];
+
+  // ── CABEÇALHO ──────────────────────────────────────────────
+  // Faixa cinza claro topo
+  doc.setFillColor(248,248,248);doc.rect(0,0,W,36,'F');
+  doc.setDrawColor(...borda);doc.setLineWidth(0.3);doc.line(0,36,W,36);
+
+  // Logotipo ADAB simulado (círculo verde + texto)
+  doc.setFillColor(...verde);doc.circle(22,18,10,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(7);doc.setFont('helvetica','bold');
+  doc.text('ADAB',22,16,{align:'center'});
+  doc.setFontSize(5);doc.setFont('helvetica','normal');
+  doc.text('BAHIA',22,20,{align:'center'});
+
+  // Títulos ao lado do logo
+  doc.setTextColor(...cinza);doc.setFontSize(8);doc.setFont('helvetica','normal');
+  doc.text('Agência Estadual de Defesa Agropecuária da Bahia',36,10);
+  doc.text('Informações principais vinculadas ao Certificado Fitossanitário de Origem',36,16);
+  doc.setTextColor(...preto);doc.setFontSize(10);doc.setFont('helvetica','bold');
+  doc.text(`Certificado Fitossanitário de Origem Nº ${r.nCfo||'—'}`,36,24);
+
+  // ── TABELA DE DADOS DO PRODUTOR ─────────────────────────────
+  let y=42;
+  function cabSecao(titulo, yy){
+    doc.setFillColor(220,230,220);doc.rect(m,yy,cw,6,'F');
+    doc.setDrawColor(...borda);doc.rect(m,yy,cw,6,'S');
+    doc.setTextColor(...preto);doc.setFontSize(8);doc.setFont('helvetica','bold');
+    doc.text(titulo,m+2,yy+4.2);
+    return yy+6;
+  }
+  function linha(lbl, val, yy, lw, vw){
+    lw=lw||50; vw=vw||(cw-lw);
+    doc.setFillColor(255,255,255);doc.rect(m,yy,lw,7,'F');
+    doc.setFillColor(252,252,252);doc.rect(m+lw,yy,vw,7,'F');
+    doc.setDrawColor(...borda);doc.rect(m,yy,lw,7,'S');doc.rect(m+lw,yy,vw,7,'S');
+    doc.setTextColor(...cinza);doc.setFontSize(7.5);doc.setFont('helvetica','bold');
+    doc.text(lbl,m+2,yy+4.8);
+    doc.setTextColor(...preto);doc.setFont('helvetica','normal');
+    doc.text(String(val||''),m+lw+2,yy+4.8,{maxWidth:vw-4});
+    return yy+7;
+  }
+  function linha2(lbl1,val1,lbl2,val2,yy){
+    const hw=cw/2;
+    doc.setFillColor(255,255,255);doc.rect(m,yy,hw,7,'F');
+    doc.setFillColor(252,252,252);doc.rect(m+hw,yy,hw,7,'F');
+    doc.setDrawColor(...borda);doc.rect(m,yy,hw,7,'S');doc.rect(m+hw,yy,hw,7,'S');
+    doc.setTextColor(...cinza);doc.setFontSize(7.5);doc.setFont('helvetica','bold');
+    doc.text(lbl1,m+2,yy+4.8);
+    doc.setTextColor(...preto);doc.setFont('helvetica','normal');
+    doc.text(String(val1||''),m+28,yy+4.8,{maxWidth:hw-30});
+    doc.setTextColor(...cinza);doc.setFont('helvetica','bold');
+    doc.text(lbl2,m+hw+2,yy+4.8);
+    doc.setTextColor(...preto);doc.setFont('helvetica','normal');
+    doc.text(String(val2||''),m+hw+34,yy+4.8,{maxWidth:hw-36});
+    return yy+7;
+  }
+
+  y=linha('Nome Produtor', r.produtor||'—', y);
+  y=linha('Propriedade', r.obs||'—', y);
+  y=linha('Endereço', '—', y);
+  y=linha('Município/UF', (r.orgao==='ADAB'?'Juazeiro / BA':'—'), y);
+  y=linha2('CNPJ ou CPF','—','Código da Propriedade',r.codUp?.slice(0,11)||'—',y);
+
+  // ── DADOS DOS PRODUTOS ──────────────────────────────────────
+  y=cabSecao('DADOS DOS PRODUTOS', y+4);
+  // Cabeçalho da tabela de produtos
+  const cols=[['Código da UP',52],['Produto / Nome Científico',68],['Quantidade',22],['Unidade',28],['Colheita',cw-52-68-22-28]];
+  let cx=m;
+  doc.setFillColor(235,235,235);
+  cols.forEach(([h,w])=>{doc.rect(cx,y,w,6,'F');doc.setDrawColor(...borda);doc.rect(cx,y,w,6,'S');doc.setTextColor(...cinza);doc.setFontSize(6.5);doc.setFont('helvetica','bold');doc.text(h,cx+1,y+4.2,{maxWidth:w-2});cx+=w;});
+  y+=6;
+  // Linha de dados
+  cx=m;
+  const vals=[r.codUp||'—', (r.variedade||r.produto||'—'), parseFloat(r.quantidade||0).toFixed(4), r.unidade||'—', fmtD(r.data)];
+  doc.setFillColor(255,255,255);
+  cols.forEach(([,w],i)=>{doc.rect(cx,y,w,8,'F');doc.setDrawColor(...borda);doc.rect(cx,y,w,8,'S');doc.setTextColor(...preto);doc.setFontSize(7);doc.setFont('helvetica','normal');doc.text(vals[i],cx+1,y+5,{maxWidth:w-2});cx+=w;});
+  y+=8;
+
+  // ── CERTIFICAÇÃO ────────────────────────────────────────────
+  y+=4;
+  doc.setTextColor(...preto);doc.setFontSize(8);doc.setFont('helvetica','normal');
+  doc.text('Certifico que, mediante acompanhamento técnico, o(s) produto(s) acima especificado(s) se apresenta(m):',m,y,{maxWidth:cw});
+  y+=8;
+  doc.setFontSize(7.5);
+  doc.text('Livre(s) da(s) praga(s) Quarentenária(s) A2;',m+4,y);y+=5;
+  doc.text('Livre(s) da(s) Praga(s) específica(s), por exigência do país importador; conforme regulamentação do MAPA;',m+4,y,{maxWidth:cw-4});y+=8;
+
+  // Declaração adicional
+  y=cabSecao('DECLARAÇÃO ADICIONAL', y+2);
+  doc.setTextColor(...preto);doc.setFontSize(7.5);doc.setFont('helvetica','normal');
+  doc.text('Os frutos foram produzidos em propriedade onde são adotadas as medidas de prevenção e controle do cancro bacteriano',m+2,y+5,{maxWidth:cw-4});
+  doc.text('da videira, prevista na legislação fitossanitária.',m+2,y+10,{maxWidth:cw-4});
+  y+=16;
+
+  // Lacre
+  y+=2;doc.setFontSize(8);doc.setFont('helvetica','bold');
+  doc.text(`PARTIDA LACRADA NA ORIGEM: Não`,m,y);y+=6;
+  y=linha2('Nº lacre','—','Nº porão','—',y);
+  y=linha('Nº contêiner','—',y);
+
+  // ── RESPONSÁVEL TÉCNICO ─────────────────────────────────────
+  y=cabSecao('DADOS DO RESPONSÁVEL TÉCNICO HABILITADO', y+4);
+  y=linha('Emitente', r.tecnico||'—', y);
+  y=linha2('Função','Engenheiro(a) Agrônomo(a)','CREA',r.crea||'—',y);
+  y=linha('Nº Habilitação', r.habilitacao||'—', y);
+
+  // ── EMISSÃO E VALIDADE ──────────────────────────────────────
+  y+=6;
+  doc.setFillColor(255,255,255);doc.setDrawColor(...verde);doc.setLineWidth(0.5);
+  doc.rect(m,y,cw,14,'FD');
+  doc.setTextColor(...verde);doc.setFontSize(8);doc.setFont('helvetica','bold');
+  // Data emissão
+  const emissao=r.data?fmtD(r.data):'—';
+  // Vencimento: ADAB=30d, ADAGRO=16d
+  let venc='—';
+  if(r.data){
+    const [ano,mes,dia]=r.data.split('-').map(Number);
+    const dv=new Date(ano,mes-1,dia);
+    dv.setDate(dv.getDate()+(r.orgao==='ADAB'?30:16));
+    venc=`${String(dv.getDate()).padStart(2,'0')}/${String(dv.getMonth()+1).padStart(2,'0')}/${dv.getFullYear()}`;
+  }
+  doc.text(`EMITIDO EM: ${emissao}`,m+4,y+6);
+  doc.text(`DOCUMENTO VÁLIDO ATÉ ${venc} E SERÁ NULO SE RASURADO`,m+4,y+12);
+
+  // ── RODAPÉ ─────────────────────────────────────────────────
+  y+=20;
+  doc.setFontSize(7);doc.setTextColor(...cinza);doc.setFont('helvetica','normal');
+  doc.text(`Identificador de validação e autenticidade: https://sidab.adab.ba.gov.br/sem-login/validar-cfo/listar`,m,y);
+  y+=5;
+  doc.text(`${new Date().toLocaleString('pt-BR')}   ADAB - Sistema de Defesa Agropecuária da Bahia`,m,y);
+
+  doc.save(`CFO_${r.nCfo||r.id}_${hoje()}.pdf`);
+  toast(`PDF do CFO ${r.nCfo} gerado ✓`,'ok');
+}
+function pdfCFOC(nCfoc){
+  // Busca todos os CFOs do grupo deste CFOC
+  const grupo = regs.filter(r => r.tipo==='CFOC' && (r.nCfoc===nCfoc || (!nCfoc && r.id===nCfoc)));
+  if(!grupo.length){toast('CFOC não encontrado','err');return;}
+  const r0 = grupo[0];
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+  const W=210, m=14, cw=W-m*2;
+  const verde=[45,106,79], azul=[20,90,124], preto=[26,35,50], cinza=[100,116,139], borda=[180,180,180];
+
+  // ── CABEÇALHO ──────────────────────────────────────────────
+  doc.setFillColor(248,248,248); doc.rect(0,0,W,36,'F');
+  doc.setDrawColor(...borda); doc.setLineWidth(0.3); doc.line(0,36,W,36);
+
+  // Logo ADAB
+  doc.setFillColor(...azul); doc.circle(22,18,10,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(7); doc.setFont('helvetica','bold');
+  doc.text('ADAB',22,16,{align:'center'});
+  doc.setFontSize(5); doc.setFont('helvetica','normal');
+  doc.text('BAHIA',22,20,{align:'center'});
+
+  doc.setTextColor(...cinza); doc.setFontSize(8); doc.setFont('helvetica','normal');
+  doc.text('Agência Estadual de Defesa Agropecuária da Bahia',36,10);
+  doc.text('Certificado Fitossanitário de Origem de Consolidação',36,16);
+  doc.setTextColor(...preto); doc.setFontSize(10); doc.setFont('helvetica','bold');
+  doc.text(`CFOC Nº ${r0.nCfoc||'—'}`,36,24);
+
+  // ── DADOS DO CFOC ───────────────────────────────────────────
+  function cabSecao(titulo,yy){
+    doc.setFillColor(210,228,240); doc.rect(m,yy,cw,6,'F');
+    doc.setDrawColor(...borda); doc.rect(m,yy,cw,6,'S');
+    doc.setTextColor(...preto); doc.setFontSize(8); doc.setFont('helvetica','bold');
+    doc.text(titulo,m+2,yy+4.2); return yy+6;
+  }
+  function linhaT(lbl,val,yy,lw){
+    lw=lw||50; const vw=cw-lw;
+    doc.setFillColor(255,255,255); doc.rect(m,yy,lw,7,'F');
+    doc.setFillColor(252,252,252); doc.rect(m+lw,yy,vw,7,'F');
+    doc.setDrawColor(...borda); doc.rect(m,yy,lw,7,'S'); doc.rect(m+lw,yy,vw,7,'S');
+    doc.setTextColor(...cinza); doc.setFontSize(7.5); doc.setFont('helvetica','bold');
+    doc.text(lbl,m+2,yy+4.8);
+    doc.setTextColor(...preto); doc.setFont('helvetica','normal');
+    doc.text(String(val||'—'),m+lw+2,yy+4.8,{maxWidth:vw-4});
+    return yy+7;
+  }
+  function linha2(l1,v1,l2,v2,yy){
+    const hw=cw/2;
+    doc.setFillColor(255,255,255); doc.rect(m,yy,hw,7,'F');
+    doc.setFillColor(252,252,252); doc.rect(m+hw,yy,hw,7,'F');
+    doc.setDrawColor(...borda); doc.rect(m,yy,hw,7,'S'); doc.rect(m+hw,yy,hw,7,'S');
+    doc.setTextColor(...cinza); doc.setFontSize(7.5); doc.setFont('helvetica','bold');
+    doc.text(l1,m+2,yy+4.8);
+    doc.setTextColor(...preto); doc.setFont('helvetica','normal');
+    doc.text(String(v1||'—'),m+26,yy+4.8,{maxWidth:hw-28});
+    doc.setTextColor(...cinza); doc.setFont('helvetica','bold');
+    doc.text(l2,m+hw+2,yy+4.8);
+    doc.setTextColor(...preto); doc.setFont('helvetica','normal');
+    doc.text(String(v2||'—'),m+hw+30,yy+4.8,{maxWidth:hw-32});
+    return yy+7;
+  }
+
+  let y=42;
+  y=linhaT('Nº do CFOC', r0.nCfoc||'—', y);
+  y=linha2('Data', fmtD(r0.data), 'Órgão', r0.orgao||'—', y);
+  y=linhaT('Nº do Lote', r0.nLote||'—', y);
+  y=linha2('Produto', r0.produto||'UVA', 'Variedade', r0.variedade||'—', y);
+  y=linha2('Qtd. Total CFOC', parseFloat(r0.qtdCfoc||0).toFixed(2)+' '+r0.unidade, 'Destino', r0.destino||'—', y);
+
+  // ── TABELA DE CFOs VINCULADOS ───────────────────────────────
+  y = cabSecao('CFOs VINCULADOS A ESTE CFOC', y+4);
+  const colsV=[['Nº CFO',40],['PRODUTOR',60],['COD. UP',50],['QUANTID',22],['UNIDADE',cw-172]];
+  let cx=m;
+  doc.setFillColor(225,240,225);
+  colsV.forEach(([h,w])=>{
+    doc.rect(cx,y,w,6,'F'); doc.setDrawColor(...borda); doc.rect(cx,y,w,6,'S');
+    doc.setTextColor(...cinza); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+    doc.text(h,cx+1,y+4.2,{maxWidth:w-2}); cx+=w;
+  });
+  y+=6;
+
+  grupo.forEach((r,idx)=>{
+    const bg = idx%2===0 ? [255,255,255] : [248,252,248];
+    doc.setFillColor(...bg);
+    colsV.forEach(([,w],ci)=>{doc.rect(m+colsV.slice(0,ci).reduce((s,[,w])=>s+w,0),y,w,7,'F');});
+    doc.setDrawColor(...borda);
+    cx=m;
+    const vals=[r.nCfo||'—', r.produtor||'—', r.codUp||'—', parseFloat(r.quantidade||0).toFixed(2), r.unidade||'—'];
+    colsV.forEach(([,w],ci)=>{
+      doc.rect(cx,y,w,7,'S');
+      doc.setTextColor(...preto); doc.setFontSize(7); doc.setFont('helvetica','normal');
+      doc.text(vals[ci],cx+1,y+5,{maxWidth:w-2}); cx+=w;
+    });
+    y+=7;
+  });
+
+  // Linha de total
+  const volTotal = grupo.reduce((s,r)=>s+(parseFloat(r.quantidade)||0),0);
+  doc.setFillColor(216,243,220); doc.rect(m,y,cw,7,'F');
+  doc.setDrawColor(...borda); doc.rect(m,y,cw,7,'S');
+  doc.setTextColor(...verde); doc.setFontSize(8); doc.setFont('helvetica','bold');
+  doc.text(`TOTAL: ${grupo.length} CFO(s) vinculados   |   Volume: ${volTotal.toFixed(4)} ton`,m+2,y+4.8);
+  y+=7;
+
+  // ── VALIDADE ───────────────────────────────────────────────
+  y+=6;
+  doc.setFillColor(255,255,255); doc.setDrawColor(...azul); doc.setLineWidth(0.5);
+  doc.rect(m,y,cw,14,'FD');
+  let venc='—';
+  if(r0.data){
+    const [ano,mes,dia]=r0.data.split('-').map(Number);
+    const dv=new Date(ano,mes-1,dia);
+    dv.setDate(dv.getDate()+(r0.orgao==='ADAB'?30:16));
+    venc=`${String(dv.getDate()).padStart(2,'0')}/${String(dv.getMonth()+1).padStart(2,'0')}/${dv.getFullYear()}`;
+  }
+  doc.setTextColor(...azul); doc.setFontSize(8); doc.setFont('helvetica','bold');
+  doc.text(`EMITIDO EM: ${fmtD(r0.data)}`,m+4,y+6);
+  doc.text(`DOCUMENTO VÁLIDO ATÉ ${venc} E SERÁ NULO SE RASURADO`,m+4,y+12);
+
+  // ── RODAPÉ ─────────────────────────────────────────────────
+  y+=20;
+  doc.setFontSize(7); doc.setTextColor(...cinza); doc.setFont('helvetica','normal');
+  doc.text('Identificador de validação: https://sidab.adab.ba.gov.br/sem-login/validar-cfo/listar',m,y);
+  y+=5;
+  doc.text(`${new Date().toLocaleString('pt-BR')}   ADAB - Sistema de Defesa Agropecuária da Bahia`,m,y);
+
+  doc.save(`CFOC_${r0.nCfoc||r0.id}_${hoje()}.pdf`);
+  toast(`PDF do CFOC ${r0.nCfoc} gerado ✓`,'ok');
+}
+
+function del(id){if(!confirm('Excluir?'))return;regs=regs.filter(r=>r.id!==id);save();const tabAtiva=document.querySelector('.tab.active')?.id?.replace('tab-','');if(tabAtiva==='cfo'){renderTabsAno('CFO');renderCFO();}else if(tabAtiva==='cfoc'){renderTabsAno('CFOC');renderCFOC();}renderRel();toast('Excluído','inf');}
+function delGrupo(chave){if(!confirm('Excluir todos os CFOs deste grupo?'))return;regs=regs.filter(r=>r.tipo!=='CFOC'||(r.nLote!==chave&&r.nCfoc!==chave));save();renderTabsAno('CFOC');renderCFOC();renderRel();toast('Grupo excluído','inf');}
+function srt(t,f){if(sf[t]===f)sd[t]*=-1;else{sf[t]=f;sd[t]=1;}if(t==='cfo')renderCFO();else renderCFOC();}
+
+// =================== EXCEL ===================
+function xlsCFO(){
+  const d=regs.filter(r=>r.tipo==='CFO');if(!d.length){toast('Nenhum CFO','err');return;}
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([['PLANILHA DE ACOMPANHAMENTO LIVRO UVA'],['DATA CFO','VARIEDADE','PRODUTOR','COD. DA UP','Nº CFO','QUANTID.','UNIDADE','OBSERVAÇÃO'],...d.map(r=>[fmtD(r.data),r.variedade||'',r.produtor||'',r.codUp||'',r.nCfo||'',parseFloat(r.quantidade||0),r.unidade||'',r.obs||''])]);
+  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:7}}];ws['!cols']=[{wch:12},{wch:22},{wch:28},{wch:22},{wch:14},{wch:10},{wch:8},{wch:24}];
+  XLSX.utils.book_append_sheet(wb,ws,'Livro CFO');XLSX.writeFile(wb,`Livro_CFO_${hoje()}.xlsx`);toast('Excel CFO ✓','ok');
+}
+function buildWsCFOC(dados){
+  // Ordena e agrupa por lote/cfoc
+  const grupos={};
+  dados.forEach(r=>{const k=r.nLote||r.nCfoc||r.data||'';if(!grupos[k])grupos[k]=[];grupos[k].push(r);});
+
+  const rows=[['CONTROLE DE CFOC – ADAB'],
+    ['DATA','Nº CFO','QUANTID','UNIDADE','Nº DO LOTE','PRODUTO','Nº DE CFOC','QUANTID CFOC','VARIEDADE','DESTINO','ÓRGÃO']];
+  const merges=[{s:{r:0,c:0},e:{r:0,c:10}}]; // título mesclado
+  const colsMesclar=[0,3,4,5,6,7,8,9,10]; // DATA,UNIDADE,LOTE,PRODUTO,CFOC,QTDCFOC,VAR,DEST,ORGAO
+
+  let rowIdx=2; // começa após título+cabeçalho
+  Object.values(grupos).forEach(grupo=>{
+    const n=grupo.length;
+    const r0=grupo[0];
+    grupo.forEach((r,i)=>{
+      rows.push([
+        i===0?fmtD(r.data):'',           // DATA
+        r.nCfo||'',                        // Nº CFO
+        parseFloat(r.quantidade||0),       // QUANTID
+        i===0?r.unidade||'':'',            // UNIDADE
+        i===0?r.nLote||'':'',             // Nº DO LOTE
+        i===0?r.produto||'UVA':'',        // PRODUTO
+        i===0?r.nCfoc||'':'',             // Nº DE CFOC
+        i===0?parseFloat(r.qtdCfoc||0):'',// QUANTID CFOC
+        i===0?r.variedade||'':'',         // VARIEDADE
+        i===0?r.destino||'':'',           // DESTINO
+        i===0?r.orgao||'':''             // ÓRGÃO
+      ]);
+    });
+    // Mesclar colunas do grupo se mais de 1 linha
+    if(n>1){
+      colsMesclar.forEach(c=>{
+        merges.push({s:{r:rowIdx,c},e:{r:rowIdx+n-1,c}});
+      });
+    }
+    rowIdx+=n;
+  });
+
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!merges']=merges;
+  ws['!cols']=[{wch:12},{wch:14},{wch:10},{wch:8},{wch:22},{wch:8},{wch:14},{wch:12},{wch:24},{wch:12},{wch:8}];
+  return ws;
+}
+
+function xlsCFOC(){
+  const d=regs.filter(r=>r.tipo==='CFOC');if(!d.length){toast('Nenhum CFOC','err');return;}
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,buildWsCFOC(d),'Controle CFOC');
+  XLSX.writeFile(wb,`CFOC_${hoje()}.xlsx`);toast('Excel CFOC ✓','ok');
+}
+function xlsGeral(){
+  const wb=XLSX.utils.book_new();
+  const cfos=regs.filter(r=>r.tipo==='CFO'),cfocs=regs.filter(r=>r.tipo==='CFOC');
+  if(!cfos.length&&!cfocs.length){toast('Sem dados','err');return;}
+  if(cfos.length){const ws=XLSX.utils.aoa_to_sheet([['PLANILHA DE ACOMPANHAMENTO LIVRO UVA'],['DATA CFO','VARIEDADE','PRODUTOR','COD. DA UP','Nº CFO','QUANTID.','UNIDADE','ÓRGÃO','OBSERVAÇÃO'],...cfos.map(r=>[fmtD(r.data),r.variedade||'',r.produtor||'',r.codUp||'',r.nCfo||'',parseFloat(r.quantidade||0),r.unidade||'',r.orgao||'',r.obs||''])]);ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:8}}];XLSX.utils.book_append_sheet(wb,ws,'Livro CFO');}
+  if(cfocs.length){XLSX.utils.book_append_sheet(wb,buildWsCFOC(cfocs),'Controle CFOC');}
+  XLSX.writeFile(wb,`CFO_CFOC_Completo_${hoje()}.xlsx`);toast('Excel completo ✓','ok');
+}
+
+// =================== PDF ===================
+function cabPDF(doc,t,s){doc.setFillColor(45,106,79);doc.rect(0,0,297,20,'F');doc.setTextColor(255,255,255);doc.setFontSize(13);doc.setFont('helvetica','bold');doc.text(t,148.5,11,{align:'center'});doc.setFontSize(8);doc.setFont('helvetica','normal');doc.text(`${s}  |  Gerado: ${new Date().toLocaleString('pt-BR')}`,148.5,17,{align:'center'});}
+function rodaPDF(doc,pn){doc.setFontSize(7);doc.setTextColor(150);doc.text(`Pág. ${pn}  |  Sistema CFO/CFOC — Livro Uva`,148.5,206,{align:'center'});}
+function pdfCFO(){
+  const d=regs.filter(r=>r.tipo==='CFO');if(!d.length){toast('Nenhum CFO','err');return;}
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  cabPDF(doc,'PLANILHA DE ACOMPANHAMENTO LIVRO UVA',`Total: ${d.length} certificados`);
+  doc.autoTable({head:[['DATA CFO','VARIEDADE','PRODUTOR','COD. DA UP','Nº CFO','QUANTID.','UNIDADE','OBSERVAÇÃO']],body:d.map(r=>[fmtD(r.data),r.variedade||'',r.produtor||'',r.codUp||'',r.nCfo||'',parseFloat(r.quantidade||0).toFixed(4),r.unidade||'',r.obs||'']),startY:22,headStyles:{fillColor:[45,106,79],textColor:255,fontStyle:'bold',fontSize:8,halign:'center'},bodyStyles:{fontSize:8,cellPadding:2.2},alternateRowStyles:{fillColor:[248,250,251]},columnStyles:{0:{cellWidth:22},1:{cellWidth:36},2:{cellWidth:46},3:{cellWidth:36},4:{cellWidth:25},5:{cellWidth:18,halign:'right'},6:{cellWidth:15},7:{cellWidth:50}},margin:{left:7,right:7},didDrawPage:d=>rodaPDF(doc,d.pageNumber)});
+  doc.save(`Livro_CFO_${hoje()}.pdf`);toast('PDF CFO ✓','ok');
+}
+function pdfCFOC(){
+  const d=regs.filter(r=>r.tipo==='CFOC');if(!d.length){toast('Nenhum CFOC','err');return;}
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  cabPDF(doc,'CONTROLE DE CFOC – ADAB',`Total: ${d.length} registros`);
+  doc.autoTable({head:[['DATA','Nº CFO','QUANTID','UNIDADE','Nº DO LOTE','PRODUTO','Nº DE CFOC','QUANTID','VARIEDADE','DESTINO']],body:d.map(r=>[fmtD(r.data),r.nCfo||'',parseFloat(r.quantidade||0).toFixed(2),r.unidade||'',r.nLote||'',r.produto||'UVA',r.nCfoc||'',parseFloat(r.qtdCfoc||0).toFixed(2),r.variedade||'',r.destino||'']),startY:22,headStyles:{fillColor:[45,106,79],textColor:255,fontStyle:'bold',fontSize:8,halign:'center'},bodyStyles:{fontSize:8,cellPadding:2.2},alternateRowStyles:{fillColor:[248,250,251]},columnStyles:{0:{cellWidth:22},1:{cellWidth:24},2:{cellWidth:18,halign:'right'},3:{cellWidth:14},4:{cellWidth:38},5:{cellWidth:14},6:{cellWidth:22},7:{cellWidth:18,halign:'right'},8:{cellWidth:32},9:{cellWidth:22}},margin:{left:7,right:7},didDrawPage:d=>rodaPDF(doc,d.pageNumber)});
+  doc.save(`CFOC_${hoje()}.pdf`);toast('PDF CFOC ✓','ok');
+}
+function pdfGeral(){
+  const cfos=regs.filter(r=>r.tipo==='CFO'),cfocs=regs.filter(r=>r.tipo==='CFOC');
+  if(!cfos.length&&!cfocs.length){toast('Sem dados','err');return;}
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  doc.setFillColor(45,106,79);doc.rect(0,0,297,210,'F');doc.setTextColor(255,255,255);
+  doc.setFontSize(26);doc.setFont('helvetica','bold');doc.text('RELATÓRIO CFO / CFOC',148.5,78,{align:'center'});
+  doc.setFontSize(14);doc.setFont('helvetica','normal');doc.text('Planilha de Acompanhamento — Livro Uva',148.5,93,{align:'center'});
+  doc.setFontSize(11);doc.text('ADAB · ADAGRO · Controle Fitossanitário',148.5,108,{align:'center'});
+  doc.setFontSize(10);doc.text(`Gerado: ${new Date().toLocaleString('pt-BR')}  |  CFOs: ${cfos.length}  CFOCs: ${new Set(cfocs.map(r=>r.nCfoc).filter(Boolean)).size}`,148.5,128,{align:'center'});
+  doc.text(`Volume CFO: ${cfos.reduce((s,r)=>s+(parseFloat(r.quantidade)||0),0).toFixed(2)} ton`,148.5,142,{align:'center'});
+  if(cfos.length){doc.addPage();cabPDF(doc,'PLANILHA DE ACOMPANHAMENTO LIVRO UVA',`${cfos.length} certificados`);doc.autoTable({head:[['DATA CFO','VARIEDADE','PRODUTOR','COD. DA UP','Nº CFO','QUANTID.','UNIDADE','ÓRGÃO','OBS']],body:cfos.map(r=>[fmtD(r.data),r.variedade||'',r.produtor||'',r.codUp||'',r.nCfo||'',parseFloat(r.quantidade||0).toFixed(4),r.unidade||'',r.orgao||'',r.obs||'']),startY:22,headStyles:{fillColor:[45,106,79],textColor:255,fontStyle:'bold',fontSize:7.5,halign:'center'},bodyStyles:{fontSize:7.5,cellPadding:2},alternateRowStyles:{fillColor:[248,250,251]},columnStyles:{0:{cellWidth:20},1:{cellWidth:30},2:{cellWidth:40},3:{cellWidth:30},4:{cellWidth:22},5:{cellWidth:16,halign:'right'},6:{cellWidth:12},7:{cellWidth:14},8:{cellWidth:38}},margin:{left:7,right:7},didDrawPage:d=>rodaPDF(doc,d.pageNumber)});}
+  if(cfocs.length){doc.addPage();cabPDF(doc,'CONTROLE DE CFOC – ADAB',`${cfocs.length} registros`);doc.autoTable({head:[['DATA','Nº CFO','QTDE','UND','Nº LOTE','PRODUTO','Nº CFOC','QTDE CFOC','VARIEDADE','DESTINO']],body:cfocs.map(r=>[fmtD(r.data),r.nCfo||'',parseFloat(r.quantidade||0).toFixed(2),r.unidade||'',r.nLote||'',r.produto||'UVA',r.nCfoc||'',parseFloat(r.qtdCfoc||0).toFixed(2),r.variedade||'',r.destino||'']),startY:22,headStyles:{fillColor:[45,106,79],textColor:255,fontStyle:'bold',fontSize:7.5,halign:'center'},bodyStyles:{fontSize:7.5,cellPadding:2},alternateRowStyles:{fillColor:[248,250,251]},margin:{left:7,right:7},didDrawPage:d=>rodaPDF(doc,d.pageNumber)});}
+  doc.save(`Relatorio_${hoje()}.pdf`);toast('PDF Relatório ✓','ok');
+}
+
+// =================== UTILS ===================
+function renderPag(elId,total,pag,cb){
+  const np=Math.ceil(total/PP),el=document.getElementById(elId);
+  if(np<=1){el.innerHTML='';return;}
+  let h=`<button class="pgb" onclick="(${cb})(${pag-1})" ${pag===1?'disabled':''}>‹</button>`;
+  for(let i=1;i<=np;i++){if(i===1||i===np||Math.abs(i-pag)<=1)h+=`<button class="pgb ${i===pag?'active':''}" onclick="(${cb})(${i})">${i}</button>`;else if(Math.abs(i-pag)===2)h+=`<span style="color:var(--muted);padding:0 3px">…</span>`;}
+  h+=`<button class="pgb" onclick="(${cb})(${pag+1})" ${pag===np?'disabled':''}>›</button>`;
+  el.innerHTML=h;
+}
+function fmtD(d){if(!d)return'—';if(d.includes('/'))return d;const[y,m,dd]=d.split('-');return`${dd}/${m}/${y}`;}
+function hoje(){return new Date().toISOString().split('T')[0];}
+function toast(msg,type='inf'){
+  const ic={ok:'✅',err:'❌',inf:'ℹ️',gs:'📊'};
+  const d=document.createElement('div');d.className=`t ${type}`;
+  d.innerHTML=`<span>${ic[type]||'ℹ️'}</span><span>${msg}</span>`;
+  document.getElementById('toast').appendChild(d);setTimeout(()=>d.remove(),4000);
+}
+
+// =================== EVENTOS ===================
+['s-cfo','f-var','f-prod','f-oc'].forEach(id=>document.getElementById(id).addEventListener(id==='s-cfo'?'input':'change',renderCFO));
+['s-cfoc','f-oc2','f-dest'].forEach(id=>document.getElementById(id).addEventListener(id==='s-cfoc'?'input':'change',renderCFOC));
+
+// =================== INIT ===================
+popFiltros();
+
+// ====================================================
+// =================== LOGIN SYSTEM ===================
+// ====================================================
+
+const AUTH_KEY   = 'cfo_auth_session';
+const USERS_KEY  = 'cfo_users';
+const SESSION_H  = 8; // horas de sessão
+
+// --- Hash SHA-256 ---
+async function sha256(msg){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// --- Usuários ---
+function getUsers(){
+  try{ return JSON.parse(localStorage.getItem(USERS_KEY)||'[]'); }catch{ return []; }
+}
+function saveUsers(u){ localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
+
+async function initDefaultUser(){
+  const users = getUsers();
+  if(users.length === 0){
+    const hash = await sha256('admin123');
+    saveUsers([{
+      id:'u1', username:'admin', nome:'Administrador',
+      role:'admin', passHash: hash, criadoEm: new Date().toISOString()
+    }]);
+  }
+}
+
+// --- Sessão ---
+function getSession(){
+  try{
+    const s = JSON.parse(localStorage.getItem(AUTH_KEY)||'null');
+    if(!s) return null;
+    if(new Date() > new Date(s.expira)){ localStorage.removeItem(AUTH_KEY); return null; }
+    return s;
+  }catch{ return null; }
+}
+function setSession(user){
+  const expira = new Date(Date.now() + SESSION_H * 3600 * 1000).toISOString();
+  localStorage.setItem(AUTH_KEY, JSON.stringify({
+    userId: user.id, username: user.username,
+    nome: user.nome, role: user.role, expira
+  }));
+}
+function clearSession(){ localStorage.removeItem(AUTH_KEY); }
+
+// --- Login ---
+async function fazerLogin(){
+  const username = document.getElementById('li-user').value.trim().toLowerCase();
+  const password = document.getElementById('li-pass').value;
+  const errEl    = document.getElementById('login-err');
+  const errMsg   = document.getElementById('login-err-msg');
+
+  if(!username || !password){
+    errMsg.textContent = 'Preencha usuário e senha.';
+    errEl.classList.add('show'); return;
+  }
+
+  const users = getUsers();
+  const user  = users.find(u => u.username.toLowerCase() === username);
+  if(!user){
+    errMsg.textContent = 'Usuário não encontrado.';
+    errEl.classList.add('show'); return;
+  }
+
+  const hash = await sha256(password);
+  if(hash !== user.passHash){
+    errMsg.textContent = 'Senha incorreta.';
+    errEl.classList.add('show');
+    document.getElementById('li-pass').value = '';
+    return;
+  }
+
+  errEl.classList.remove('show');
+  setSession(user);
+  mostrarApp(user);
+}
+
+// --- Logout ---
+function fazerLogout(){
+  if(!confirm('Deseja sair do sistema?')) return;
+  clearSession();
+  location.reload();
+}
+
+// --- Mostrar App ---
+function mostrarApp(session){
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  // Avatar e nome no header
+  const inicial = (session.nome||session.username||'?')[0].toUpperCase();
+  document.getElementById('user-avatar').textContent   = inicial;
+  document.getElementById('user-name-hd').textContent  = session.nome||session.username;
+  document.getElementById('user-role-hd').textContent  = session.role==='admin'?'Administrador':'Usuário';
+  document.getElementById('ud-fullname').textContent   = session.nome||session.username;
+  document.getElementById('ud-username').textContent   = '@'+session.username;
+
+  // Mostrar gerenciar usuários só para admin
+  if(session.role === 'admin'){
+    document.getElementById('ud-gerenciar').style.display = 'flex';
+  }
+}
+
+// --- Alterar Senha ---
+function abrirModalSenha(){
+  document.getElementById('s-atual').value='';
+  document.getElementById('s-nova').value='';
+  document.getElementById('s-conf').value='';
+  document.getElementById('modal-senha').classList.add('open');
+  document.getElementById('user-pill').classList.remove('open');
+  setTimeout(()=>document.getElementById('s-atual').focus(),100);
+}
+function fechaModalSenha(){ document.getElementById('modal-senha').classList.remove('open'); }
+
+async function alterarSenha(){
+  const atual = document.getElementById('s-atual').value;
+  const nova  = document.getElementById('s-nova').value;
+  const conf  = document.getElementById('s-conf').value;
+  const sess  = getSession();
+  if(!sess){ toast('Sessão expirada','err'); return; }
+
+  if(!atual||!nova||!conf){ toast('Preencha todos os campos','err'); return; }
+  if(nova.length < 6){ toast('Nova senha deve ter ao menos 6 caracteres','err'); return; }
+  if(nova !== conf){ toast('Confirmação de senha não confere','err'); return; }
+
+  const users    = getUsers();
+  const idx      = users.findIndex(u => u.id === sess.userId);
+  if(idx === -1){ toast('Usuário não encontrado','err'); return; }
+
+  const hashAtual = await sha256(atual);
+  if(hashAtual !== users[idx].passHash){ toast('Senha atual incorreta','err'); return; }
+
+  users[idx].passHash = await sha256(nova);
+  saveUsers(users);
+  fechaModalSenha();
+  toast('Senha alterada com sucesso ✓','ok');
+}
+
+// --- Gerenciar Usuários (admin) ---
+function abrirModalUsuarios(){
+  document.getElementById('user-pill').classList.remove('open');
+  renderUserList();
+  document.getElementById('modal-usuarios').classList.add('open');
+}
+function fechaModalUsuarios(){ document.getElementById('modal-usuarios').classList.remove('open'); }
+
+function renderUserList(){
+  const users = getUsers();
+  const sess  = getSession();
+  const el    = document.getElementById('usr-list');
+  if(!users.length){ el.innerHTML='<div style="text-align:center;color:var(--muted);padding:20px">Nenhum usuário cadastrado.</div>'; return; }
+  el.innerHTML = users.map(u=>`
+    <div class="usr-item">
+      <div class="usr-avatar-lg">${(u.nome||u.username||'?')[0].toUpperCase()}</div>
+      <div class="usr-info">
+        <div class="un">${u.nome||u.username}</div>
+        <div class="ur">@${u.username} &nbsp;
+          <span class="${u.role==='admin'?'badge-admin':'badge-user'}">${u.role==='admin'?'Admin':'Usuário'}</span>
+        </div>
+      </div>
+      <div class="usr-actions">
+        ${u.id !== sess?.userId
+          ? `<button class="ib ib-del" onclick="excluirUsuario('${u.id}')" title="Excluir">🗑</button>`
+          : '<span style="font-size:11px;color:var(--muted)">(você)</span>'}
+      </div>
+    </div>`).join('');
+}
+
+async function criarUsuario(){
+  const username = document.getElementById('nu-user').value.trim().toLowerCase();
+  const pass     = document.getElementById('nu-pass').value;
+  const nome     = document.getElementById('nu-nome').value.trim();
+  const role     = document.getElementById('nu-role').value;
+
+  if(!username||!pass||!nome){ toast('Preencha todos os campos do novo usuário','err'); return; }
+  if(pass.length < 6){ toast('Senha deve ter ao menos 6 caracteres','err'); return; }
+  if(!/^[a-z0-9._-]+$/.test(username)){ toast('Usuário: use letras, números, ponto ou hífen','err'); return; }
+
+  const users = getUsers();
+  if(users.find(u=>u.username===username)){ toast('Usuário já existe','err'); return; }
+
+  const hash = await sha256(pass);
+  users.push({ id:'u'+Date.now(), username, nome, role, passHash:hash, criadoEm:new Date().toISOString() });
+  saveUsers(users);
+  document.getElementById('nu-user').value='';
+  document.getElementById('nu-pass').value='';
+  document.getElementById('nu-nome').value='';
+  renderUserList();
+  toast(`Usuário @${username} criado ✓`,'ok');
+}
+
+function excluirUsuario(id){
+  const users = getUsers();
+  const u = users.find(x=>x.id===id);
+  if(!u) return;
+  if(!confirm(`Excluir o usuário @${u.username}?`)) return;
+  saveUsers(users.filter(x=>x.id!==id));
+  renderUserList();
+  toast(`Usuário @${u.username} excluído`,'ok');
+}
+
+// --- Renovar sessão a cada interação ---
+document.addEventListener('click', ()=>{
+  const s = getSession();
+  if(s) setSession(s); // renova expiração
+});
+
+// --- Verificar sessão ao carregar ---
+(async ()=>{
+  await initDefaultUser();
+  const session = getSession();
+  if(session){
+    mostrarApp(session);
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    setTimeout(()=>document.getElementById('li-user').focus(), 200);
+  }
+
+  // Fechar dropdown ao clicar fora
+  document.addEventListener('click', e=>{
+    const pill = document.getElementById('user-pill');
+    if(pill && !pill.contains(e.target)) pill.classList.remove('open');
+  });
+})();
+</script>
+</div><!-- /app -->
+</body>
+</html>
