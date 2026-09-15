@@ -2291,6 +2291,12 @@ const AUTH_EMAILS = {
   admin: 'ls2310220@gmail.com'
 };
 
+// Usuários criados pelo sistema usam um e-mail técnico interno no Firebase Authentication.
+// O usuário continua digitando somente o nome de usuário na tela de login.
+function emailAuthDoUsuario(username){
+  return AUTH_EMAILS[username] || `${username}@sistema-cfoc.local`;
+}
+
 async function fazerLogin(){
   const username = document.getElementById('li-user').value.trim().toLowerCase();
   const password = document.getElementById('li-pass').value;
@@ -2302,11 +2308,7 @@ async function fazerLogin(){
     errEl.classList.add('show'); return;
   }
 
-  const email = AUTH_EMAILS[username];
-  if(!email){
-    errMsg.textContent = 'Usuário ainda não está vinculado ao Firebase Authentication.';
-    errEl.classList.add('show'); return;
-  }
+  const email = emailAuthDoUsuario(username);
 
   try{
     // Autenticação real: depois desta linha request.auth deixa de ser nulo no Firestore.
@@ -2387,27 +2389,34 @@ async function alterarSenha(){
   const nova  = document.getElementById('s-nova').value;
   const conf  = document.getElementById('s-conf').value;
   const sess  = getSession();
-  if(!sess){ toast('Sessão expirada','err'); return; }
+  const currentUser = auth.currentUser;
 
+  if(!sess || !currentUser){ toast('Sessão expirada. Entre novamente.','err'); return; }
   if(!atual||!nova||!conf){ toast('Preencha todos os campos','err'); return; }
   if(nova.length < 6){ toast('Nova senha deve ter ao menos 6 caracteres','err'); return; }
   if(nova !== conf){ toast('Confirmação de senha não confere','err'); return; }
 
-  let user;
   try{
-    const doc = await colUsuarios.doc(sess.userId).get();
-    user = doc.exists ? { id: doc.id, ...doc.data() } : null;
-  }catch(e){ console.error(e); toast('Erro ao consultar o Firestore','err'); return; }
-  if(!user){ toast('Usuário não encontrado','err'); return; }
+    // Confirma a senha atual no Firebase Authentication.
+    const cred = firebase.auth.EmailAuthProvider.credential(currentUser.email, atual);
+    await currentUser.reauthenticateWithCredential(cred);
+    await currentUser.updatePassword(nova);
 
-  const hashAtual = await sha256(atual);
-  if(hashAtual !== user.passHash){ toast('Senha atual incorreta','err'); return; }
+    // Mantém um hash no Firestore apenas para compatibilidade com registros antigos.
+    try{
+      await colUsuarios.doc(sess.userId).update({ passHash: await sha256(nova) });
+    }catch(e){ console.warn('Não foi possível atualizar o hash legado no Firestore:', e); }
 
-  try{
-    await colUsuarios.doc(user.id).update({ passHash: await sha256(nova) });
-  }catch(e){ console.error(e); toast('Erro ao salvar no Firestore','err'); return; }
-  fechaModalSenha();
-  toast('Senha alterada com sucesso ✓','ok');
+    fechaModalSenha();
+    toast('Senha alterada com sucesso ✓','ok');
+  }catch(e){
+    console.error(e);
+    let msg='Não foi possível alterar a senha.';
+    if(e?.code==='auth/wrong-password' || e?.code==='auth/invalid-credential'){ msg='Senha atual incorreta.'; }
+    else if(e?.code==='auth/weak-password'){ msg='A nova senha deve ter ao menos 6 caracteres.'; }
+    else if(e?.code==='auth/requires-recent-login'){ msg='Por segurança, saia e entre novamente antes de alterar a senha.'; }
+    toast(msg,'err');
+  }
 }
 
 // --- Gerenciar Usuários (admin) ---
@@ -2448,10 +2457,12 @@ async function criarUsuario(){
   const pass     = document.getElementById('nu-pass').value;
   const nome     = document.getElementById('nu-nome').value.trim();
   const role     = document.getElementById('nu-role').value;
+  const btn      = document.querySelector('#modal-usuarios button[onclick="criarUsuario()"]');
 
   if(!username||!pass||!nome){ toast('Preencha todos os campos do novo usuário','err'); return; }
   if(pass.length < 6){ toast('Senha deve ter ao menos 6 caracteres','err'); return; }
   if(!/^[a-z0-9._-]+$/.test(username)){ toast('Usuário: use letras, números, ponto ou hífen','err'); return; }
+  if(!auth.currentUser){ toast('Sessão do administrador não está ativa. Entre novamente.','err'); return; }
 
   let jaExiste;
   try{
@@ -2460,15 +2471,38 @@ async function criarUsuario(){
   }catch(e){ console.error(e); toast('Erro ao consultar o Firestore','err'); return; }
   if(jaExiste){ toast('Usuário já existe','err'); return; }
 
-  const hash = await sha256(pass);
+  if(btn){ btn.disabled=true; btn.classList.add('btn-loading'); btn.innerHTML='<span class="spin"></span> Criando...'; }
+
   try{
-    await saveUsuario({ id: username, username, nome, role, passHash:hash, criadoEm:new Date().toISOString() });
-  }catch(e){ console.error(e); toast('Erro ao salvar no Firestore','err'); return; }
-  document.getElementById('nu-user').value='';
-  document.getElementById('nu-pass').value='';
-  document.getElementById('nu-nome').value='';
-  renderUserList();
-  toast(`Usuário @${username} criado ✓`,'ok');
+    const token = await auth.currentUser.getIdToken();
+    const resposta = await fetch('/.netlify/functions/create-user', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':`Bearer ${token}`
+      },
+      body:JSON.stringify({ username, password:pass, nome, role })
+    });
+
+    let resultado={};
+    try{ resultado=await resposta.json(); }catch(_){}
+
+    if(!resposta.ok || !resultado.sucesso){
+      throw new Error(resultado.erro || 'Não foi possível criar o usuário.');
+    }
+
+    // A Function já cria a conta no Authentication e o perfil no Firestore.
+    document.getElementById('nu-user').value='';
+    document.getElementById('nu-pass').value='';
+    document.getElementById('nu-nome').value='';
+    renderUserList();
+    toast(`Usuário @${username} criado no Firebase ✓`,'ok');
+  }catch(e){
+    console.error('Erro ao criar usuário:',e);
+    toast(e.message || 'Erro ao criar usuário','err');
+  }finally{
+    if(btn){ btn.disabled=false; btn.classList.remove('btn-loading'); btn.innerHTML='➕ Criar Usuário'; }
+  }
 }
 
 async function excluirUsuario(id){
