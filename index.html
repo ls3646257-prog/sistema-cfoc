@@ -16,6 +16,7 @@
 <!-- Firebase (SDK compat, compatível com script classico) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
 <style>
 :root{
   --verde:#2d6a4f;--verde2:#40916c;--verde3:#52b788;
@@ -292,7 +293,7 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-size:11px}
       <input type="password" id="li-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')fazerLogin()">
     </div>
     <button class="btn-login" onclick="fazerLogin()">Entrar →</button>
-    <div class="login-footer">Acesso restrito · Dados armazenados localmente</div>
+    <div class="login-footer">Acesso restrito · Firebase Authentication + Firestore</div>
   </div>
 </div>
 
@@ -341,7 +342,7 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-size:11px}
     <div class="hd-ico">🍇</div>
     <div>
       <div class="hd-title">Sistema CFO / CFOC — Livro Uva</div>
-      <div class="hd-sub">ADAB · ADAGRO · Controle Fitossanitário · 100% Local</div>
+      <div class="hd-sub">ADAB · ADAGRO · Controle Fitossanitário · Firestore</div>
     </div>
   </div>
   <div class="hd-r">
@@ -708,6 +709,7 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const auth = firebase.auth();
 // Cache local para funcionar mesmo com internet instável
 db.enablePersistence({synchronizeTabs:true}).catch(()=>{ /* persistência indisponível (ex.: várias abas antigas) — segue sem cache offline */ });
 
@@ -2214,8 +2216,8 @@ function toast(msg,type='inf'){
 ['s-cfoc','f-oc2','f-dest'].forEach(id=>document.getElementById(id).addEventListener(id==='s-cfoc'?'input':'change',renderCFOC));
 
 // =================== INIT ===================
+// O Firestore só é acessado depois que o Firebase Authentication confirmar a sessão.
 popFiltros();
-carregarRegistros(); // inicia o listener em tempo real da coleção "registros"
 
 // ====================================================
 // =================== LOGIN SYSTEM ===================
@@ -2246,14 +2248,18 @@ async function excluirUsuarioDoc(id){
 }
 
 async function initDefaultUser(){
-  const snap = await colUsuarios.limit(1).get();
-  if(snap.empty){
-    const hash = await sha256('admin123');
-    await saveUsuario({
-      id:'admin', username:'admin', nome:'Administrador',
-      role:'admin', passHash: hash, criadoEm: new Date().toISOString()
-    });
-  }
+  // Não cria mais usuário automaticamente. O acesso é controlado pelo Firebase Authentication.
+  // O perfil "admin" deve existir na coleção "usuarios" e estar vinculado ao usuário do Authentication.
+  return;
+}
+
+// --- Inicialização protegida do Firestore ---
+let _dadosFirestoreIniciados = false;
+function iniciarDadosFirestore(){
+  if(_dadosFirestoreIniciados) return;
+  if(!auth.currentUser) return;
+  _dadosFirestoreIniciados = true;
+  carregarRegistros();
 }
 
 // --- Sessão ---
@@ -2279,6 +2285,12 @@ function setSession(user){
 function clearSession(){ sessionStorage.removeItem(AUTH_KEY); }
 
 // --- Login ---
+// O sistema mantém o campo visual "Usuário", mas autentica de fato no Firebase Authentication.
+// Para o usuário administrativo existente no projeto, o usuário "admin" corresponde ao e-mail cadastrado no Firebase.
+const AUTH_EMAILS = {
+  admin: 'ls2310220@gmail.com'
+};
+
 async function fazerLogin(){
   const username = document.getElementById('li-user').value.trim().toLowerCase();
   const password = document.getElementById('li-pass').value;
@@ -2290,36 +2302,52 @@ async function fazerLogin(){
     errEl.classList.add('show'); return;
   }
 
-  let user;
+  const email = AUTH_EMAILS[username];
+  if(!email){
+    errMsg.textContent = 'Usuário ainda não está vinculado ao Firebase Authentication.';
+    errEl.classList.add('show'); return;
+  }
+
   try{
+    // Autenticação real: depois desta linha request.auth deixa de ser nulo no Firestore.
+    await auth.signInWithEmailAndPassword(email, password);
+
+    // Agora, e somente agora, consultamos o perfil do usuário no Firestore.
     const doc = await colUsuarios.doc(username).get();
-    user = doc.exists ? { id: doc.id, ...doc.data() } : null;
+    const user = doc.exists ? { id: doc.id, ...doc.data() } : null;
+
+    if(!user){
+      await auth.signOut();
+      errMsg.textContent = 'Perfil do usuário não encontrado no Firestore.';
+      errEl.classList.add('show'); return;
+    }
+
+    errEl.classList.remove('show');
+    setSession({...user, uid: auth.currentUser.uid});
+    mostrarApp(user);
+    iniciarDadosFirestore();
   }catch(e){
-    console.error(e);
-    errMsg.textContent = 'Erro ao consultar o Firestore. Verifique sua conexão.';
-    errEl.classList.add('show'); return;
-  }
-  if(!user){
-    errMsg.textContent = 'Usuário não encontrado.';
-    errEl.classList.add('show'); return;
-  }
-
-  const hash = await sha256(password);
-  if(hash !== user.passHash){
-    errMsg.textContent = 'Senha incorreta.';
+    console.error('Erro de autenticação/Firestore:', e);
+    let msg = 'Não foi possível entrar.';
+    if(e?.code === 'auth/invalid-credential' || e?.code === 'auth/wrong-password' || e?.code === 'auth/user-not-found'){
+      msg = 'Usuário ou senha incorretos.';
+    }else if(e?.code === 'auth/invalid-email'){
+      msg = 'E-mail de autenticação inválido.';
+    }else if(e?.code === 'auth/too-many-requests'){
+      msg = 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+    }else if(e?.code === 'permission-denied'){
+      msg = 'Acesso ao Firestore negado. Verifique as regras de segurança.';
+    }else if(e?.message){
+      msg = `Erro: ${e.message}`;
+    }
+    errMsg.textContent = msg;
     errEl.classList.add('show');
-    document.getElementById('li-pass').value = '';
-    return;
   }
-
-  errEl.classList.remove('show');
-  setSession(user);
-  mostrarApp(user);
 }
-
 // --- Logout ---
-function fazerLogout(){
+async function fazerLogout(){
   if(!confirm('Deseja sair do sistema?')) return;
+  try{ await auth.signOut(); }catch(e){ console.error(e); }
   clearSession();
   location.reload();
 }
@@ -2462,9 +2490,11 @@ document.addEventListener('click', ()=>{
 (async ()=>{
   await initDefaultUser();
   const session = getSession();
-  if(session){
+  if(session && auth.currentUser){
     mostrarApp(session);
+    iniciarDadosFirestore();
   } else {
+    clearSession();
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
     setTimeout(()=>document.getElementById('li-user').focus(), 200);
