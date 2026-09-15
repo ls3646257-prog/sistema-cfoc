@@ -2244,7 +2244,34 @@ async function saveUsuario(user){
   await colUsuarios.doc(id).set(dados);
 }
 async function excluirUsuarioDoc(id){
-  await colUsuarios.doc(id).delete();
+  try {
+    const token = await auth.currentUser.getIdToken();
+
+    const resposta = await fetch('/.netlify/functions/delete-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        username: id
+      })
+    });
+
+    const resultado = await resposta.json();
+
+    if (!resposta.ok) {
+      throw new Error(resultado.erro || 'Erro ao excluir usuário.');
+    }
+
+    toast(resultado.mensagem || 'Usuário excluído com sucesso.', 'ok');
+
+    await renderUserList();
+
+  } catch (erro) {
+    console.error(erro);
+    toast(erro.message || 'Erro ao excluir usuário.', 'err');
+  }
 }
 
 async function initDefaultUser(){
